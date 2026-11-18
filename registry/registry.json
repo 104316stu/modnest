@@ -162,18 +162,18 @@
                          "name":  "Colosseum Hard Mode",
                          "author":  "ChainedForge",
                          "description":  "Tougher arena: enemies +50% health and +30% damage, a stronger Senate boss, angry crowds throw pots and no starting coins.",
-                         "version":  "0.0.0",
+                         "version":  "1.0.0",
                          "category":  "Difficulty",
                          "installType":  "cf-pack",
                          "installFolder":  "HardMode",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-hard-mode-1.0.0/cf-hard-mode-1.0.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/HardMode/pack.json"
                                     ],
-                         "sha256":  ""
+                         "sha256":  "05a93635066ba0996d1043bc1da9d168ecff519455875b4eaae8b898574ab1ab"
                      }
                  ]
 }
