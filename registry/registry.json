@@ -120,18 +120,18 @@
                          "name":  "Rounds \u0026 Rain",
                          "author":  "ChainedForge",
                          "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather, Blood Vial, Fungal Bloom, Reaper\u0027s Edge, Shattered Glass, a coin flip and nasty curses.",
-                         "version":  "0.0.0",
+                         "version":  "1.0.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
                          "installFolder":  "RoundsAndRain",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-rounds-and-rain-1.0.0/cf-rounds-and-rain-1.0.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/RoundsAndRain/pack.json"
                                     ],
-                         "sha256":  ""
+                         "sha256":  "a2c9d044685bce2fe3eafaae0abf69962adfd9bc2d4546e565a6997992979afa"
                      },
                      {
                          "id":  "cf-starter-pack",
