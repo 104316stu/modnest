@@ -1,8 +1,8 @@
 //! ModNest: mod manager core. Everything the UI does goes through the commands below.
 pub mod installer;
 pub mod profiles;
-mod registry;
-mod steam;
+pub mod registry;
+pub mod steam;
 pub mod store;
 mod thunderstore;
 

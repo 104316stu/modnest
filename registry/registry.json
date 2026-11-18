@@ -179,6 +179,26 @@
             ],
             "sha256": "05a93635066ba0996d1043bc1da9d168ecff519455875b4eaae8b898574ab1ab",
             "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-hard-mode.png"
+        },
+        {
+            "id": "chained-beasts-complete",
+            "games": [
+                "chained-beasts"
+            ],
+            "name": "Chained Beasts Complete Pack",
+            "author": "ChainedForge",
+            "description": "Everything you need to play together: ChainedForge plus Arena Deck, Rounds & Rain, ChainedForge Starter Pack. Colosseum Hard Mode is left out (it's a difficulty choice); add it separately if the host plays with it.",
+            "version": "1.0.0",
+            "category": "Modpack",
+            "installType": "modpack",
+            "dependencies": [
+                "chainedforge",
+                "cf-arena-deck",
+                "cf-rounds-and-rain",
+                "cf-starter-pack"
+            ],
+            "download": "",
+            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
         }
     ]
 }
