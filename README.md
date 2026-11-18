@@ -6,8 +6,14 @@ and mods can be switched off, updated or removed with one click.
 
 - **Your games:** Chained Beasts (BepInEx 6 IL2CPP + ChainedForge) and IRON NEST (BepInEx 6 IL2CPP + Iron Nest Multiplayer).
   Their base mods are installed as soon as you open the game and can't be removed or switched off.
-- **20 Thunderstore games** (Lethal Company, R.E.P.O., PEAK, ROUNDS, Risk of Rain 2, Schedule I …): the full Thunderstore catalog,
-  with search, sorting and automatic dependencies. The loader (BepInExPack / MelonLoader) is installed with the first mod.
+- **Every Thunderstore game** (about 376), matched to your Steam library by name, with search, sorting, categories and automatic dependencies.
+  The loader (BepInExPack / MelonLoader) is installed with the first mod.
+- **CurseForge:** add your free API key (Settings; get one at console.curseforge.com) to search and install CurseForge mods and modpacks.
+  Mods whose authors don't allow downloads by other apps link to their CurseForge page instead.
+- **Several sources per game:** Browse has a switch between your catalog, Thunderstore and CurseForge (e.g. Iron Nest shows your mods and the community's).
+- **Add a game:** any folder. ModNest works out the loader (BepInEx 5, BepInEx 6 IL2CPP, MelonLoader, or plain files into a mods folder you choose),
+  can link it to a Thunderstore game for browsing, and starts non-Steam games from their .exe.
+- **My stuff:** your profiles in every game, Thunderstore Mod Manager profiles you can import, and everything you've published.
 - **Install from file:** any mod `.zip` on your PC (Thunderstore zips, ChainedForge packs, plain plugin folders).
 - **Profiles:** saved sets of mods per game. Switching swaps the mods in the game folder (downloads are cached, so it's quick).
   Share a profile as a **ModNest code** (the mod list is inside the code, no server) or a **Thunderstore code**
@@ -19,6 +25,14 @@ and mods can be switched off, updated or removed with one click.
 - Dependencies installed for a mod are removed again when nothing needs them. **Play without mods** starts the game with the loader switched off for that run.
 - **Auto-update:** mods update when you open a game; the app updates itself from GitHub Releases.
 - Finds your games by reading Steam's own library files, on every drive.
+
+## Chained Beasts for friends (no ModNest needed)
+
+Send this link: **https://github.com/104316stu/modnest/releases/download/chained-beasts-setup/ChainedBeasts-Mods-Setup.exe**
+
+It finds the game, installs BepInEx + ChainedForge + the *Chained Beasts Complete Pack* (newest versions from the catalog),
+and switches mods on for Steam. Running it again updates; typing R removes. Source: `src-tauri/src/bin/chained-setup.rs`.
+To change what friends get, edit the `chained-beasts-complete` entry's `dependencies` in `registry/registry.json`.
 
 ## Where things are stored (no server)
 

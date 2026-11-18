@@ -15,24 +15,32 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check the update-signing key is set up
+        id: key
         env:
           KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         shell: pwsh
         run: |
-          if (-not $env:KEY) {
-            Write-Error "Add the repo secret TAURI_SIGNING_PRIVATE_KEY (contents of %USERPROFILE%\.tauri\modnest.key) before tagging a release. Or build and upload the release locally (see README)."
-            exit 1
+          if ($env:KEY) { "ok=true" >> $env:GITHUB_OUTPUT }
+          else {
+            "ok=false" >> $env:GITHUB_OUTPUT
+            Write-Output "::notice::Skipped: no TAURI_SIGNING_PRIVATE_KEY secret, so this release is built and uploaded from your PC instead (see README)."
           }
       - uses: actions/checkout@v4
+        if: steps.key.outputs.ok == 'true'
       - uses: actions/setup-node@v4
+        if: steps.key.outputs.ok == 'true'
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.key.outputs.ok == 'true'
       - uses: swatinem/rust-cache@v2
+        if: steps.key.outputs.ok == 'true'
         with:
           workspaces: src-tauri
       - run: npm ci
+        if: steps.key.outputs.ok == 'true'
       - uses: tauri-apps/tauri-action@v0
+        if: steps.key.outputs.ok == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
