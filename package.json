@@ -1,0 +1,14 @@
+{
+  "name": "modnest",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ModNest: a Rust (Tauri) mod manager for Steam games. Your own mods plus everything on Thunderstore.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.0"
+  }
+}
