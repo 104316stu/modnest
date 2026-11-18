@@ -72,6 +72,9 @@ pub struct GameRecord {
     /// Per-game choice for "Steam starts the normal game". None = follow the global setting.
     #[serde(default)]
     pub steam_vanilla: Option<bool>,
+    /// Where plain mod files go for this game (CurseForge / files without a loader).
+    #[serde(default)]
+    pub mods_folder: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -82,11 +85,14 @@ pub struct Settings {
     /// Mods only run when the game is started from ModNest; Steam starts the normal game.
     #[serde(default = "yes")]
     pub steam_vanilla: bool,
+    /// Free key from console.curseforge.com; needed for CurseForge browsing.
+    #[serde(default)]
+    pub curseforge_key: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { auto_update_mods: true, auto_install_loader: true, steam_vanilla: true }
+        Settings { auto_update_mods: true, auto_install_loader: true, steam_vanilla: true, curseforge_key: String::new() }
     }
 }
 
@@ -102,6 +108,37 @@ pub struct Data {
     /// Game id -> tall cover image url (Thunderstore community covers).
     #[serde(default)]
     pub covers: BTreeMap<String, String>,
+    /// Games added by hand in "Add a game".
+    #[serde(default)]
+    pub custom_games: Vec<CustomGame>,
+    /// Thunderstore communities found to use MelonLoader rather than BepInEx.
+    #[serde(default)]
+    pub melon_games: std::collections::BTreeSet<String>,
+}
+
+/// A game added by hand: any folder, any loader.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomGame {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    /// bepinex5 | bepinex6-il2cpp | melonloader | none
+    pub loader: String,
+    /// Where plain mod files go (relative to the game folder), for games without a loader.
+    #[serde(default)]
+    pub mods_folder: String,
+    /// Thunderstore community to browse for this game, if any.
+    #[serde(default)]
+    pub thunderstore: Option<String>,
+    /// CurseForge game id to browse for this game, if any.
+    #[serde(default)]
+    pub curseforge: Option<u32>,
+    /// The game's .exe, for starting games that aren't on Steam.
+    #[serde(default)]
+    pub exe: Option<String>,
+    #[serde(default)]
+    pub steam_app_id: Option<u32>,
 }
 
 pub struct Store {

@@ -19,6 +19,9 @@ pub struct OwnGame {
     pub accent: Option<String>,
     #[serde(default)]
     pub base_packages: Vec<String>,
+    /// Thunderstore community id to also browse for this game (optional; matched by Steam id/name otherwise).
+    #[serde(default)]
+    pub thunderstore: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

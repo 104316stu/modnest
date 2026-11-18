@@ -25,6 +25,9 @@ pub enum Layout {
     Melon,
     /// A modpack from our own catalog: no files, just a list of dependencies.
     Modpack,
+    /// Plain files copied into a folder of the game (for games without a mod loader).
+    /// `folder` is that folder relative to the game, or empty for the game folder itself.
+    Folder,
 }
 
 impl Layout {
@@ -35,6 +38,7 @@ impl Layout {
             "thunderstore" => Layout::Thunderstore,
             "melon" => Layout::Melon,
             "modpack" => Layout::Modpack,
+            "folder" => Layout::Folder,
             _ => Layout::Plugin,
         }
     }
@@ -46,6 +50,7 @@ impl Layout {
             Layout::Thunderstore => "thunderstore",
             Layout::Melon => "melon",
             Layout::Modpack => "modpack",
+            Layout::Folder => "folder",
         }
     }
 }
@@ -95,6 +100,14 @@ pub fn plan(layout: Layout, folder: &str, names: &[String]) -> Vec<(String, Stri
 
     match layout {
         Layout::Modpack => {}
+        Layout::Folder => {
+            for n in &files {
+                if !n.contains('/') && SKIP_META.contains(&n.to_ascii_lowercase().as_str()) {
+                    continue;
+                }
+                out.push((n.clone(), if folder.is_empty() { n.clone() } else { format!("{}/{n}", folder.trim_matches('/')) }));
+            }
+        }
         Layout::Root => {
             let prefix = ["winhttp.dll", "version.dll", "doorstop_config.ini"]
                 .iter()
@@ -337,4 +350,28 @@ pub fn launch_args(app_id: u32, melonloader: bool, mods: bool) -> Vec<String> {
         args.extend(["--doorstop-enabled".into(), v.into(), "--doorstop-enable".into(), v.into()]);
     }
     args
+}
+
+/// True when the bytes are a zip archive (CurseForge sometimes serves a bare .dll instead).
+pub fn is_zip(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"PK\x03\x04") || bytes.starts_with(b"PK\x05\x06")
+}
+
+/// Installs a mod that is a single file rather than a zip. Returns the relative path written.
+pub fn write_single(root: &Path, layout: Layout, folder: &str, file_name: &str, bytes: &[u8]) -> Result<Vec<String>> {
+    let name = Path::new(file_name).file_name().map(|n| n.to_string_lossy().to_string()).filter(|n| !n.is_empty()).ok_or_else(|| anyhow!("The download has no file name"))?;
+    let dest = match layout {
+        Layout::Thunderstore | Layout::Plugin => format!("BepInEx/plugins/{folder}/{name}"),
+        Layout::Melon if name.to_ascii_lowercase().ends_with(".dll") => format!("Mods/{name}"),
+        Layout::Melon => format!("UserData/{folder}/{name}"),
+        Layout::Folder if !folder.is_empty() => format!("{}/{name}", folder.trim_matches('/')),
+        _ => name.clone(),
+    };
+    let full = safe_join(root, &dest)?;
+    if let Some(d) = full.parent() {
+        fs::create_dir_all(d)?;
+    }
+    let _ = fs::remove_file(with_suffix(&full));
+    fs::write(&full, bytes).with_context(|| format!("Could not write {dest}. Is the game running?"))?;
+    Ok(vec![dest])
 }

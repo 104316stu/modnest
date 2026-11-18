@@ -1,0 +1,24 @@
+CHAINED BEASTS MODS - HOW TO INSTALL
+
+1. You need Chained Beasts on Steam.
+
+2. Download ChainedBeasts-Mods-Setup.exe and double-click it.
+   Windows may show a blue "Windows protected your PC" box because the file
+   isn't signed by a company. Click "More info", then "Run anyway".
+
+3. It finds the game by itself and installs everything:
+   BepInEx (the mod loader), ChainedForge, and the packs
+   (Arena Deck, Rounds & Rain, Starter Pack). Press Enter when it says done.
+
+4. Start Chained Beasts from Steam like normal. The first start takes a bit
+   longer. The main menu now has a "Mods" button.
+
+Playing together:
+- Everyone needs the same mod version. When there's an update, just run the
+  setup file again.
+- If joining says the mods don't match, open the Mods menu and make sure the
+  same packs are switched on as the host.
+
+Removing the mods: run the setup file again and type R, then press Enter.
+
+Game in an unusual place? Drag the Chained Beasts folder onto the setup file.

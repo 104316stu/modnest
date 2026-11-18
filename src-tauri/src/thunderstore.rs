@@ -40,8 +40,57 @@ pub const COMMUNITIES: &[Community] = &[
     Community { id: "schedule-i", name: "Schedule I", steam_app_ids: &[3164500], melonloader: true },
 ];
 
-pub fn community(id: &str) -> Option<&'static Community> {
-    COMMUNITIES.iter().find(|c| c.id == id)
+/// A Thunderstore community (one game), from the hand-picked list above or Thunderstore's full list.
+#[derive(Serialize, serde::Deserialize, Clone, Debug)]
+pub struct CommunityInfo {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub steam_app_ids: Vec<u32>,
+    #[serde(default)]
+    pub melonloader: bool,
+    #[serde(default)]
+    pub cover: Option<String>,
+    #[serde(default)]
+    pub hero: Option<String>,
+}
+
+/// The hand-picked communities (Steam ids known up front).
+pub fn known() -> Vec<CommunityInfo> {
+    COMMUNITIES
+        .iter()
+        .map(|c| CommunityInfo { id: c.id.into(), name: c.name.into(), steam_app_ids: c.steam_app_ids.to_vec(), melonloader: c.melonloader, cover: None, hero: None })
+        .collect()
+}
+
+/// Every game on Thunderstore (one request, ~400 entries, with artwork). Steam ids aren't included;
+/// they're matched by name against the Steam library afterwards.
+pub async fn fetch_all() -> Result<Vec<CommunityInfo>> {
+    let d = get_json(&format!("{BASE}/api/cyberstorm/community/?page_size=1000")).await?;
+    Ok(d["results"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|c| CommunityInfo {
+                    id: s(c, "identifier"),
+                    name: s(c, "name"),
+                    steam_app_ids: vec![],
+                    melonloader: false,
+                    cover: c["cover_image_url"].as_str().map(String::from),
+                    hero: c["hero_image_url"].as_str().map(String::from),
+                })
+                .filter(|c| !c.id.is_empty())
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Lowercase letters and digits only, "&" as "and", and a trailing Demo/Playtest dropped,
+/// so "IRON NEST: Heavy Turret Simulator Demo" matches Thunderstore's "IRON NEST".
+pub fn squash(name: &str) -> String {
+    let n = name.to_ascii_lowercase().replace('&', "and");
+    let n = n.trim_end_matches(" demo").trim_end_matches(" playtest");
+    n.chars().filter(|c| c.is_ascii_alphanumeric()).collect()
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -188,13 +237,18 @@ pub async fn detail(full: &str) -> Result<Detail> {
 }
 
 /// The loader package ("Namespace-Name") that a community's mods depend on.
-pub async fn find_base(community_id: &str) -> Result<Option<String>> {
-    let melon = community(community_id).map(|c| c.melonloader).unwrap_or(false);
-    let q = if melon { "MelonLoader" } else { "BepInExPack" };
-    let (items, _, _) = list(community_id, q, 1, "most-downloaded").await?;
-    let starts = |l: &&Listing| l.title.replace(' ', "_").starts_with(q) || l.title.starts_with(q);
-    let pick = items.iter().find(|l| starts(l) && l.pinned).or_else(|| items.iter().find(starts));
-    Ok(pick.map(|l| l.key.trim_start_matches("ts:").to_string()))
+/// Returns ("Namespace-Name", is_melonloader). Tries the expected loader first, then the other one,
+/// so games we don't know in advance are worked out from what their community actually uses.
+pub async fn find_base(community_id: &str, melon_hint: bool) -> Result<Option<(String, bool)>> {
+    let order = if melon_hint { ["MelonLoader", "BepInExPack"] } else { ["BepInExPack", "MelonLoader"] };
+    for q in order {
+        let (items, _, _) = list(community_id, q, 1, "most-downloaded").await?;
+        let starts = |l: &&Listing| l.title.replace(' ', "_").starts_with(q) || l.title.starts_with(q);
+        if let Some(l) = items.iter().find(|l| starts(l) && l.pinned).or_else(|| items.iter().find(starts)) {
+            return Ok(Some((l.key.trim_start_matches("ts:").to_string(), q == "MelonLoader")));
+        }
+    }
+    Ok(None)
 }
 
 /// True when a Thunderstore package is a mod loader pack (goes in the game root).

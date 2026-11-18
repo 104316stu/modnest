@@ -27,7 +27,8 @@ fn ask(prompt: &str) -> String {
     let _ = io::stdout().flush();
     let mut s = String::new();
     let _ = io::stdin().lock().read_line(&mut s);
-    s.trim().trim_matches('"').to_string()
+    // Some ways of feeding input add an invisible byte-order mark in front; ignore it.
+    s.trim().trim_start_matches('\u{feff}').trim().trim_matches('"').to_string()
 }
 
 fn run() -> Result<()> {

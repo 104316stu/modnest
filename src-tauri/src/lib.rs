@@ -4,7 +4,8 @@ pub mod profiles;
 pub mod registry;
 pub mod steam;
 pub mod store;
-mod thunderstore;
+pub mod curseforge;
+pub mod thunderstore;
 
 use installer::Layout;
 use registry::{OwnGame, Registry};
@@ -37,6 +38,10 @@ struct AppState {
     store: Mutex<Store>,
     registry: Mutex<Registry>,
     steam: Mutex<HashMap<u32, steam::SteamGame>>,
+    /// Every Thunderstore game, with Steam ids matched where possible.
+    communities: Mutex<Vec<thunderstore::CommunityInfo>>,
+    /// Every CurseForge game (empty until a CurseForge key is set).
+    cf_games: Mutex<Vec<curseforge::CfGame>>,
     /// Latest known version per "gameId|key", filled by check_updates.
     latest: Mutex<HashMap<String, String>>,
     /// Only one change to a game folder at a time.
@@ -46,23 +51,57 @@ struct AppState {
 
 // ---------- games ----------
 
-#[derive(Clone)]
-enum Kind {
-    Own(OwnGame),
-    Ts(&'static thunderstore::Community),
-}
-
+/// One game and every place its mods can come from.
 #[derive(Clone)]
 struct Game {
     id: String,
     name: String,
-    kind: Kind,
     app_ids: Vec<u32>,
+    /// Your own catalog (Chained Beasts, Iron Nest).
+    own: Option<OwnGame>,
+    ts: Option<thunderstore::CommunityInfo>,
+    cf: Option<curseforge::CfGame>,
+    custom: Option<store::CustomGame>,
+    melon: bool,
 }
 
 impl Game {
     fn melon(&self) -> bool {
-        matches!(self.kind, Kind::Ts(c) if c.melonloader)
+        self.melon
+    }
+    fn loader_name(&self) -> String {
+        if let Some(o) = &self.own {
+            return o.loader.clone();
+        }
+        if let Some(c) = &self.custom {
+            return match c.loader.as_str() {
+                "bepinex5" => "BepInEx 5".into(),
+                "bepinex6-il2cpp" => "BepInEx 6 IL2CPP".into(),
+                "melonloader" => "MelonLoader".into(),
+                _ => "No loader (plain files)".into(),
+            };
+        }
+        if self.melon { "MelonLoader".into() } else if self.ts.is_some() { "BepInEx".into() } else { "Mods folder".into() }
+    }
+    /// Uses a BepInEx-style loader (so Thunderstore routing applies to its mods).
+    fn bepinex(&self) -> bool {
+        match &self.custom {
+            Some(c) => c.loader.starts_with("bepinex"),
+            None => !self.melon && (self.own.is_some() || self.ts.is_some()),
+        }
+    }
+    fn sources(&self, reg: &Registry) -> Vec<&'static str> {
+        let mut v = Vec::new();
+        if self.own.is_some() && reg.packages.iter().any(|p| p.games.contains(&self.id)) {
+            v.push("own");
+        }
+        if self.ts.is_some() {
+            v.push("ts");
+        }
+        if self.cf.is_some() {
+            v.push("cf");
+        }
+        v
     }
 }
 
@@ -71,7 +110,10 @@ impl Game {
 struct GameView {
     id: String,
     name: String,
+    /// "own" (your catalog), "thunderstore", "curseforge" or "custom": decides the library group.
     source: &'static str,
+    /// Where Browse can look: "own", "ts", "cf".
+    sources: Vec<&'static str>,
     installed: bool,
     path: Option<String>,
     loader: String,
@@ -79,31 +121,101 @@ struct GameView {
     mod_count: usize,
     /// Wide image (Steam header).
     cover: Option<String>,
-    /// Tall cover for the game picker.
+    /// Tall cover for the library.
     capsule: Option<String>,
     /// Big banner for the game page.
     hero: Option<String>,
     active_profile: Option<String>,
+    custom: Option<store::CustomGame>,
+    mods_folder: Option<String>,
+    /// Thunderstore community id (for linking games added by hand).
+    ts_id: Option<String>,
 }
 
-fn all_games(reg: &Registry) -> Vec<Game> {
-    let mut out: Vec<Game> = reg
-        .games
-        .iter()
-        .map(|g| Game { id: g.id.clone(), name: g.name.clone(), app_ids: g.steam_app_ids.clone(), kind: Kind::Own(g.clone()) })
-        .collect();
-    for c in thunderstore::COMMUNITIES {
-        out.push(Game { id: format!("ts-{}", c.id), name: c.name.to_string(), app_ids: c.steam_app_ids.to_vec(), kind: Kind::Ts(c) });
+fn squash(s: &str) -> String {
+    thunderstore::squash(s)
+}
+
+/// Builds the full game list: your catalog, every Thunderstore game, CurseForge games (with a key)
+/// and games added by hand. The same game from several places becomes one entry with several sources.
+fn all_games(st: &AppState) -> Vec<Game> {
+    let reg = st.registry.lock().unwrap().clone();
+    let communities = st.communities.lock().unwrap().clone();
+    let cf_games = st.cf_games.lock().unwrap().clone();
+    let (custom, melon_set) = {
+        let s = st.store.lock().unwrap();
+        (s.data.custom_games.clone(), s.data.melon_games.clone())
+    };
+    let steam = st.steam.lock().unwrap().clone();
+    // Installed Steam games by squashed name, to give Thunderstore/CurseForge games their Steam id.
+    let steam_by_name: HashMap<String, u32> = steam.iter().map(|(id, g)| (squash(&g.name), *id)).collect();
+
+    let ts_ids = |c: &thunderstore::CommunityInfo| -> Vec<u32> {
+        if !c.steam_app_ids.is_empty() {
+            return c.steam_app_ids.clone();
+        }
+        steam_by_name.get(&squash(&c.name)).map(|id| vec![*id]).unwrap_or_default()
+    };
+    let mut claimed_ts: HashSet<String> = HashSet::new();
+    let mut claimed_cf: HashSet<u32> = HashSet::new();
+    let mut out: Vec<Game> = Vec::new();
+
+    let ts_for = |ids: &[u32], name: &str, explicit: Option<&str>| -> Option<thunderstore::CommunityInfo> {
+        if let Some(e) = explicit {
+            return communities.iter().find(|c| c.id == e).cloned();
+        }
+        communities.iter().find(|c| (!ids.is_empty() && ts_ids(c).iter().any(|i| ids.contains(i))) || squash(&c.name) == squash(name)).cloned()
+    };
+    let cf_for = |ids: &[u32], name: &str, explicit: Option<u32>| -> Option<curseforge::CfGame> {
+        if let Some(e) = explicit {
+            return cf_games.iter().find(|g| g.id == e).cloned();
+        }
+        let installed_names: Vec<String> = ids.iter().filter_map(|i| steam.get(i)).map(|g| squash(&g.name)).collect();
+        cf_games.iter().find(|g| squash(&g.name) == squash(name) || installed_names.contains(&squash(&g.name))).cloned()
+    };
+    let melon_of = |ts: &Option<thunderstore::CommunityInfo>| ts.as_ref().map(|c| c.melonloader || melon_set.contains(&c.id)).unwrap_or(false);
+
+    // 1. Games added by hand.
+    for c in &custom {
+        let ids: Vec<u32> = c.steam_app_id.into_iter().collect();
+        let ts = c.thunderstore.as_deref().and_then(|e| communities.iter().find(|x| x.id == e).cloned());
+        let cf = c.curseforge.and_then(|e| cf_games.iter().find(|g| g.id == e).cloned());
+        if let Some(t) = &ts { claimed_ts.insert(t.id.clone()); }
+        if let Some(g) = &cf { claimed_cf.insert(g.id); }
+        out.push(Game { id: c.id.clone(), name: c.name.clone(), app_ids: ids, own: None, melon: c.loader == "melonloader", ts, cf, custom: Some(c.clone()) });
+    }
+    // 2. Your catalog's games (they also get the matching Thunderstore / CurseForge community).
+    for g in &reg.games {
+        let ts = ts_for(&g.steam_app_ids, &g.name, g.thunderstore.as_deref());
+        let cf = cf_for(&g.steam_app_ids, &g.name, None);
+        if let Some(t) = &ts { claimed_ts.insert(t.id.clone()); }
+        if let Some(c) = &cf { claimed_cf.insert(c.id); }
+        out.push(Game { id: g.id.clone(), name: g.name.clone(), app_ids: g.steam_app_ids.clone(), own: Some(g.clone()), melon: false, ts, cf, custom: None });
+    }
+    // 3. Every other Thunderstore game.
+    for c in communities.iter().filter(|c| !claimed_ts.contains(&c.id)) {
+        let ids = ts_ids(c);
+        let cf = cf_for(&ids, &c.name, None).filter(|g| !claimed_cf.contains(&g.id));
+        if let Some(g) = &cf { claimed_cf.insert(g.id); }
+        let ts = Some(c.clone());
+        out.push(Game { id: format!("ts-{}", c.id), name: c.name.clone(), app_ids: ids, own: None, melon: melon_of(&ts), ts, cf, custom: None });
+    }
+    // 4. CurseForge-only games.
+    for g in cf_games.iter().filter(|g| !claimed_cf.contains(&g.id)) {
+        let ids: Vec<u32> = steam_by_name.get(&squash(&g.name)).map(|i| vec![*i]).unwrap_or_default();
+        out.push(Game { id: format!("cf-{}", g.slug), name: g.name.clone(), app_ids: ids, own: None, melon: false, ts: None, cf: Some(g.clone()), custom: None });
     }
     out
 }
 
 fn find_game(st: &AppState, id: &str) -> CmdResult<Game> {
-    let reg = st.registry.lock().unwrap();
-    all_games(&reg).into_iter().find(|g| g.id == id).ok_or_else(|| format!("Unknown game {id}"))
+    all_games(st).into_iter().find(|g| g.id == id).ok_or_else(|| format!("Unknown game {id}"))
 }
 
 fn game_path(st: &AppState, g: &Game) -> Option<PathBuf> {
+    if let Some(c) = &g.custom {
+        return Some(PathBuf::from(&c.path)).filter(|p| p.exists());
+    }
     if let Some(p) = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.custom_path.clone()) {
         if Path::new(&p).exists() {
             return Some(PathBuf::from(p));
@@ -117,6 +229,14 @@ fn require_path(st: &AppState, g: &Game) -> CmdResult<PathBuf> {
     game_path(st, g).ok_or_else(|| format!("{} isn't installed (or ModNest can't find it). Use \"Set game folder\".", g.name))
 }
 
+/// Folder (relative to the game) that plain mod files go into.
+fn mods_folder(st: &AppState, g: &Game) -> String {
+    if let Some(f) = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.mods_folder.clone()) {
+        return f;
+    }
+    g.custom.as_ref().map(|c| c.mods_folder.clone()).unwrap_or_default()
+}
+
 /// URL for art served from Steam's local cache (see the "art" protocol in run()).
 fn art_url(app_id: u32, kind: &str) -> Option<String> {
     steam::library_art(app_id, kind).map(|_| format!("http://art.localhost/{app_id}/{kind}"))
@@ -124,58 +244,54 @@ fn art_url(app_id: u32, kind: &str) -> Option<String> {
 
 fn view(st: &AppState, g: &Game) -> GameView {
     let path = game_path(st, g);
-    let (mod_count, header, cover, active) = {
+    let reg = st.registry.lock().unwrap().clone();
+    let (mod_count, header, active, folder) = {
         let s = st.store.lock().unwrap();
         let rec = s.data.games.get(&g.id);
         (
             rec.map(|r| r.installed.len()).unwrap_or(0),
             g.app_ids.iter().find_map(|id| s.data.art.get(id).cloned()),
-            s.data.covers.get(&g.id).cloned(),
             rec.and_then(|r| r.active_profile.clone()),
+            rec.and_then(|r| r.mods_folder.clone()),
         )
     };
     let app_id = g.app_ids.first().copied();
     let header = header.or_else(|| app_id.map(|id| format!("https://cdn.cloudflare.steamstatic.com/steam/apps/{id}/header.jpg")));
-    let loader = match &g.kind {
-        Kind::Own(o) => o.loader.clone(),
-        Kind::Ts(c) => if c.melonloader { "MelonLoader".into() } else { "BepInEx".into() },
-    };
+    let ts_cover = g.ts.as_ref().and_then(|c| c.cover.clone());
+    let ts_hero = g.ts.as_ref().and_then(|c| c.hero.clone());
+    let cf_cover = g.cf.as_ref().and_then(|c| c.cover.clone());
     GameView {
         id: g.id.clone(),
         name: g.name.clone(),
-        source: if matches!(g.kind, Kind::Own(_)) { "own" } else { "thunderstore" },
+        source: if g.own.is_some() { "own" } else if g.custom.is_some() { "custom" } else if g.ts.is_some() { "thunderstore" } else { "curseforge" },
+        sources: g.sources(&reg),
         installed: path.is_some(),
         path: path.map(|p| p.to_string_lossy().to_string()),
-        loader,
+        loader: g.loader_name(),
         app_id,
         mod_count,
-        capsule: app_id.and_then(|id| art_url(id, "capsule")).or(cover).or_else(|| header.clone()),
-        hero: app_id.and_then(|id| art_url(id, "hero")).or_else(|| header.clone()),
+        capsule: app_id.and_then(|id| art_url(id, "capsule")).or(ts_cover).or_else(|| cf_cover.clone()).or_else(|| header.clone()),
+        hero: app_id.and_then(|id| art_url(id, "hero")).or(ts_hero).or_else(|| header.clone()).or(cf_cover),
         cover: header,
         active_profile: active,
+        custom: g.custom.clone(),
+        mods_folder: folder.or_else(|| g.custom.as_ref().map(|c| c.mods_folder.clone())),
+        ts_id: g.ts.as_ref().map(|c| c.id.clone()),
     }
 }
 
-/// Header images from Steam's store API and tall covers from Thunderstore, fetched once and remembered.
+/// Steam header images for installed games (newer games use hashed URLs), fetched once and remembered.
 async fn fetch_missing_art(st: &AppState, games: &[Game]) {
-    let (missing_art, missing_covers): (Vec<u32>, Vec<(String, String)>) = {
+    let missing: Vec<u32> = {
         let s = st.store.lock().unwrap();
-        (
-            games.iter().filter_map(|g| g.app_ids.first().copied()).filter(|id| !s.data.art.contains_key(id)).collect(),
-            games
-                .iter()
-                .filter_map(|g| match g.kind {
-                    Kind::Ts(c) if !s.data.covers.contains_key(&g.id) => Some((g.id.clone(), c.id.to_string())),
-                    _ => None,
-                })
-                .collect(),
-        )
+        let steam = st.steam.lock().unwrap();
+        games.iter().filter_map(|g| g.app_ids.first().copied()).filter(|id| steam.contains_key(id) && !s.data.art.contains_key(id)).collect()
     };
-    if missing_art.is_empty() && missing_covers.is_empty() {
+    if missing.is_empty() {
         return;
     }
-    let Ok(client) = reqwest::Client::builder().user_agent("ModNest/0.1").timeout(std::time::Duration::from_secs(6)).build() else { return };
-    let art_jobs = missing_art.into_iter().map(|id| {
+    let Ok(client) = reqwest::Client::builder().user_agent("ModNest/0.2").timeout(std::time::Duration::from_secs(6)).build() else { return };
+    let jobs = missing.into_iter().map(|id| {
         let client = client.clone();
         async move {
             let url = format!("https://store.steampowered.com/api/appdetails?appids={id}&filters=basic");
@@ -183,18 +299,55 @@ async fn fetch_missing_art(st: &AppState, games: &[Game]) {
             Some((id, v[id.to_string()]["data"]["header_image"].as_str()?.to_string()))
         }
     });
-    let cover_jobs = missing_covers.into_iter().map(|(gid, cid)| {
-        let client = client.clone();
-        async move {
-            let v: serde_json::Value = client.get(format!("https://thunderstore.io/api/cyberstorm/community/{cid}/")).send().await.ok()?.json().await.ok()?;
-            Some((gid, v["cover_image_url"].as_str()?.to_string()))
-        }
-    });
-    let (arts, covers) = futures_util::join!(futures_util::future::join_all(art_jobs), futures_util::future::join_all(cover_jobs));
+    let arts = futures_util::future::join_all(jobs).await;
     let mut s = st.store.lock().unwrap();
     s.data.art.extend(arts.into_iter().flatten());
-    s.data.covers.extend(covers.into_iter().flatten());
     s.save();
+}
+
+/// Loads every Thunderstore game (cached for offline use) and gives them Steam ids from the hand-picked list.
+async fn load_communities(st: &AppState) {
+    let cache = st.data_dir.join("thunderstore-games.json");
+    let mut list = match thunderstore::fetch_all().await {
+        Ok(l) if !l.is_empty() => {
+            let _ = std::fs::write(&cache, serde_json::to_vec(&l).unwrap_or_default());
+            l
+        }
+        _ => std::fs::read(&cache).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default(),
+    };
+    for k in thunderstore::known() {
+        match list.iter_mut().find(|c| c.id == k.id) {
+            Some(c) => {
+                c.steam_app_ids = k.steam_app_ids.clone();
+                c.melonloader |= k.melonloader;
+            }
+            None => list.push(k),
+        }
+    }
+    *st.communities.lock().unwrap() = list;
+}
+
+/// Loads CurseForge's game list when a key is set (cached for offline use).
+async fn load_cf_games(st: &AppState) -> Result<(), String> {
+    let key = st.store.lock().unwrap().data.settings.curseforge_key.clone();
+    if key.trim().is_empty() {
+        st.cf_games.lock().unwrap().clear();
+        return Ok(());
+    }
+    let cache = st.data_dir.join("curseforge-games.json");
+    match curseforge::games(&key).await {
+        Ok(list) => {
+            let _ = std::fs::write(&cache, serde_json::to_vec(&list).unwrap_or_default());
+            *st.cf_games.lock().unwrap() = list;
+            Ok(())
+        }
+        Err(e) => {
+            if let Some(list) = std::fs::read(&cache).ok().and_then(|b| serde_json::from_slice(&b).ok()) {
+                *st.cf_games.lock().unwrap() = list;
+            }
+            Err(e.to_string())
+        }
+    }
 }
 
 // ---------- packages ----------
@@ -212,6 +365,8 @@ struct Pkg {
     folder: String,
     deps: Vec<String>,
     icon: Option<String>,
+    /// Original file name (CurseForge files are sometimes a single .dll rather than a zip).
+    file_name: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -231,6 +386,21 @@ fn cache_file(st: &AppState, key: &str, version: &str) -> PathBuf {
     cache_dir(st).join(format!("{}@{}.zip", safe_name(key), safe_name(version)))
 }
 
+fn cf_key(st: &AppState) -> String {
+    st.store.lock().unwrap().data.settings.curseforge_key.clone()
+}
+
+/// How a mod from Thunderstore/CurseForge/a file lands in this game.
+fn mod_layout(g: &Game) -> Layout {
+    if g.melon() {
+        Layout::Melon
+    } else if g.bepinex() {
+        Layout::Thunderstore
+    } else {
+        Layout::Folder
+    }
+}
+
 async fn resolve(st: &AppState, g: &Game, key: &str) -> CmdResult<Pkg> {
     if let Some(id) = key.strip_prefix("own:") {
         let p = st.registry.lock().unwrap().package(id).cloned().ok_or_else(|| format!("Mod {id} is not in the catalog"))?;
@@ -245,6 +415,7 @@ async fn resolve(st: &AppState, g: &Game, key: &str) -> CmdResult<Pkg> {
             folder: p.install_folder.clone().unwrap_or_else(|| p.id.clone()),
             deps: p.dependencies.iter().map(|d| format!("own:{d}")).collect(),
             icon: p.icon.clone(),
+            file_name: String::new(),
         });
     }
     if let Some(full) = key.strip_prefix("ts:") {
@@ -261,6 +432,28 @@ async fn resolve(st: &AppState, g: &Game, key: &str) -> CmdResult<Pkg> {
             folder: full.to_string(),
             deps: d.dependencies.iter().map(|d| format!("ts:{d}")).collect(),
             icon: d.icon,
+            file_name: String::new(),
+        });
+    }
+    if let Some(id) = key.strip_prefix("cf:") {
+        let m = curseforge::mod_detail(&cf_key(st), id).await.map_err(err)?;
+        let download = m.download.clone().ok_or_else(|| {
+            format!("{}'s author only allows downloading it from the CurseForge website{}", m.title, m.page_url.as_ref().map(|u| format!(": {u}")).unwrap_or_default())
+        })?;
+        let layout = mod_layout(g);
+        let folder = if layout == Layout::Folder { mods_folder(st, g) } else { format!("cf-{}", safe_name(&m.title)) };
+        return Ok(Pkg {
+            key: key.to_string(),
+            title: m.title,
+            author: m.author,
+            version: m.version,
+            download,
+            sha256: None,
+            layout,
+            folder,
+            deps: m.dependencies,
+            icon: m.icon,
+            file_name: m.file_name,
         });
     }
     if key.starts_with("local:") {
@@ -286,38 +479,58 @@ async fn resolve(st: &AppState, g: &Game, key: &str) -> CmdResult<Pkg> {
             folder: meta.folder,
             deps: vec![],
             icon: None,
+            file_name: String::new(),
         });
     }
     Err(format!("Unknown mod {key}"))
 }
 
+/// Base loader for games whose loader is known up front (your catalog, games added by hand).
+/// None means "ask Thunderstore" (it depends on what that community uses).
+fn static_base(g: &Game) -> Option<Vec<String>> {
+    if let Some(o) = &g.own {
+        return Some(o.base_packages.iter().map(|p| format!("own:{p}")).collect());
+    }
+    if let Some(c) = &g.custom {
+        return Some(match c.loader.as_str() {
+            "bepinex5" => vec!["ts:BepInEx-BepInExPack".into()],
+            "bepinex6-il2cpp" => vec!["own:bepinex-6-il2cpp".into()],
+            "melonloader" => vec!["ts:LavaGang-MelonLoader".into()],
+            _ => vec![],
+        });
+    }
+    if g.ts.is_none() {
+        return Some(vec![]); // CurseForge-only: plain files, no loader
+    }
+    None
+}
+
 /// Base (loader/framework) packages the game always needs.
 async fn base_keys(st: &AppState, g: &Game) -> Vec<String> {
-    match &g.kind {
-        Kind::Own(o) => o.base_packages.iter().map(|p| format!("own:{p}")).collect(),
-        Kind::Ts(c) => {
-            if let Some(k) = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.base_key.clone()) {
-                return vec![k];
+    if let Some(v) = static_base(g) {
+        return v;
+    }
+    if let Some(k) = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.base_key.clone()) {
+        return vec![k];
+    }
+    let Some(c) = &g.ts else { return vec![] };
+    match thunderstore::find_base(&c.id, g.melon()).await {
+        Ok(Some((full, melon))) => {
+            let k = format!("ts:{full}");
+            let mut s = st.store.lock().unwrap();
+            s.game(&g.id).base_key = Some(k.clone());
+            if melon {
+                s.data.melon_games.insert(c.id.clone());
             }
-            match thunderstore::find_base(c.id).await {
-                Ok(Some(full)) => {
-                    let k = format!("ts:{full}");
-                    let mut s = st.store.lock().unwrap();
-                    s.game(&g.id).base_key = Some(k.clone());
-                    s.save();
-                    vec![k]
-                }
-                _ => vec![],
-            }
+            s.save();
+            vec![k]
         }
+        _ => vec![],
     }
 }
 
 fn cached_base_keys(st: &AppState, g: &Game) -> Vec<String> {
-    match &g.kind {
-        Kind::Own(o) => o.base_packages.iter().map(|p| format!("own:{p}")).collect(),
-        Kind::Ts(_) => st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.base_key.clone()).into_iter().collect(),
-    }
+    static_base(g).unwrap_or_else(|| st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.base_key.clone()).into_iter().collect())
 }
 
 /// True when starting the game from Steam should run it without mods.
@@ -328,7 +541,7 @@ fn steam_vanilla(st: &AppState, g: &Game) -> bool {
 
 /// Keeps the game's doorstop_config.ini in step with the Steam setting (BepInEx games only).
 fn apply_steam_mode(st: &AppState, g: &Game, root: &Path) -> CmdResult<()> {
-    if g.melon() {
+    if g.melon() || !g.bepinex() {
         return Ok(());
     }
     installer::set_loader_default(root, !steam_vanilla(st, g)).map(|_| ()).map_err(err)
@@ -365,40 +578,36 @@ fn reconcile(st: &AppState, g: &Game, root: &Path) {
         dependencies: vec![],
         auto: false,
     };
-    match &g.kind {
-        Kind::Own(_) => {
-            for p in reg.packages.iter().filter(|p| p.games.contains(&g.id) && !p.detect.is_empty()) {
-                let key = format!("own:{}", p.id);
-                let layout = Layout::parse(&p.install_type);
-                if !p.detect.iter().all(|d| exists(d)) {
-                    // A loader whose key files were wiped (e.g. Steam "verify files") must be reinstalled.
-                    if layout == Layout::Root {
-                        rec.installed.remove(&key);
-                    }
-                    continue;
-                }
-                if rec.installed.contains_key(&key) {
-                    continue;
-                }
-                let folder = p.install_folder.clone().unwrap_or_else(|| p.id.clone());
-                let files = match layout {
-                    Layout::Plugin => installer::list_folder(root, &format!("BepInEx/plugins/{folder}")),
-                    Layout::CfPack => installer::list_folder(root, &format!("BepInEx/ChainedForgePacks/{folder}")),
-                    _ => vec![],
-                };
-                rec.installed.insert(key.clone(), adopted(key, p.name.clone(), p.author.clone(), layout.as_str(), files, p.icon.clone()));
+    // Catalog packages for this game (and catalog loaders used by games added by hand).
+    for p in reg.packages.iter().filter(|p| (p.games.contains(&g.id) || base.contains(&format!("own:{}", p.id))) && !p.detect.is_empty()) {
+        let key = format!("own:{}", p.id);
+        let layout = Layout::parse(&p.install_type);
+        if !p.detect.iter().all(|d| exists(d)) {
+            // A loader whose key files were wiped (e.g. Steam "verify files") must be reinstalled.
+            if layout == Layout::Root {
+                rec.installed.remove(&key);
             }
+            continue;
         }
-        Kind::Ts(c) => {
-            let present = if c.melonloader { exists("version.dll") && exists("MelonLoader") } else { exists("winhttp.dll") && exists("BepInEx/core") };
-            for key in base {
-                if !present {
-                    rec.installed.remove(&key);
-                } else if !rec.installed.contains_key(&key) {
-                    let title = thunderstore::pretty(key.trim_start_matches("ts:").split_once('-').map(|x| x.1).unwrap_or(&key));
-                    rec.installed.insert(key.clone(), adopted(key, title, String::new(), "root", vec![], None));
-                }
-            }
+        if rec.installed.contains_key(&key) {
+            continue;
+        }
+        let folder = p.install_folder.clone().unwrap_or_else(|| p.id.clone());
+        let files = match layout {
+            Layout::Plugin => installer::list_folder(root, &format!("BepInEx/plugins/{folder}")),
+            Layout::CfPack => installer::list_folder(root, &format!("BepInEx/ChainedForgePacks/{folder}")),
+            _ => vec![],
+        };
+        rec.installed.insert(key.clone(), adopted(key, p.name.clone(), p.author.clone(), layout.as_str(), files, p.icon.clone()));
+    }
+    // Thunderstore loader packs (BepInExPack / MelonLoader) already in the folder.
+    let present = if g.melon() { exists("version.dll") && exists("MelonLoader") } else { exists("winhttp.dll") && exists("BepInEx/core") };
+    for key in base.iter().filter(|k| k.starts_with("ts:")) {
+        if !present {
+            rec.installed.remove(key);
+        } else if !rec.installed.contains_key(key) {
+            let title = thunderstore::pretty(key.trim_start_matches("ts:").split_once('-').map(|x| x.1).unwrap_or(key));
+            rec.installed.insert(key.clone(), adopted(key.clone(), title, String::new(), "root", vec![], None));
         }
     }
     s.save();
@@ -592,7 +801,7 @@ async fn install_many(app: &AppHandle, st: &AppState, g: &Game, keys: Vec<String
         progress(app, &g.id, &p.key, &p.title, "install", 1.0);
 
         let old = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.installed.get(&p.key).cloned());
-        let (root2, layout, folder) = (root.clone(), p.layout, p.folder.clone());
+        let (root2, layout, folder, file_name) = (root.clone(), p.layout, p.folder.clone(), p.file_name.clone());
         let old_files = old.as_ref().map(|o| o.files.clone()).unwrap_or_default();
         let files = tauri::async_runtime::spawn_blocking(move || -> anyhow::Result<Vec<String>> {
             // Remove the old version's files first so renamed/deleted files don't linger.
@@ -601,6 +810,9 @@ async fn install_many(app: &AppHandle, st: &AppState, g: &Game, keys: Vec<String
             }
             if layout == Layout::Modpack {
                 return Ok(vec![]);
+            }
+            if !installer::is_zip(&bytes) && !file_name.is_empty() {
+                return installer::write_single(&root2, layout, &folder, &file_name, &bytes);
             }
             installer::extract(&root2, layout, &folder, &bytes)
         })
@@ -806,12 +1018,12 @@ async fn init(app: AppHandle, st: State<'_, AppState>) -> CmdResult<serde_json::
     *st.registry.lock().unwrap() = reg;
     let games = tauri::async_runtime::spawn_blocking(steam::installed_games).await.map_err(err)?;
     *st.steam.lock().unwrap() = games;
-    let reg = st.registry.lock().unwrap().clone();
-    let games = all_games(&reg);
+    let (_, cf) = futures_util::join!(load_communities(&st), load_cf_games(&st));
+    let games = all_games(&st);
     fetch_missing_art(&st, &games).await;
     let views: Vec<GameView> = games.iter().map(|g| view(&st, g)).collect();
     let settings = st.store.lock().unwrap().data.settings.clone();
-    Ok(json!({ "games": views, "settings": settings, "version": app.package_info().version.to_string() }))
+    Ok(json!({ "games": views, "settings": settings, "version": app.package_info().version.to_string(), "curseforgeError": cf.err() }))
 }
 
 #[tauri::command]
@@ -821,15 +1033,23 @@ async fn game_state(game_id: String, st: State<'_, AppState>) -> CmdResult<GameS
     Ok(state_of(&st, &g))
 }
 
+/// Sections (Mods / Modpacks ...) and categories for one source of a game.
 #[tauri::command]
-async fn filters(game_id: String, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
+async fn filters(game_id: String, source: String, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
     let g = find_game(&st, &game_id)?;
-    match &g.kind {
-        Kind::Ts(c) => {
-            let (sections, categories) = thunderstore::filters(c.id).await.map_err(err)?;
+    match source.as_str() {
+        "ts" => {
+            let c = g.ts.as_ref().ok_or("This game isn't on Thunderstore")?;
+            let (sections, categories) = thunderstore::filters(&c.id).await.map_err(err)?;
             Ok(json!({ "sections": sections, "categories": categories }))
         }
-        Kind::Own(_) => {
+        "cf" => {
+            let c = g.cf.as_ref().ok_or("This game isn't on CurseForge")?;
+            let classes = curseforge::classes(&cf_key(&st), c.id).await.map_err(err)?;
+            let sections: Vec<_> = classes.iter().map(|(id, name)| json!({ "id": id.to_string(), "name": name, "slug": name.to_lowercase() })).collect();
+            Ok(json!({ "sections": sections, "categories": [] }))
+        }
+        _ => {
             let reg = st.registry.lock().unwrap().clone();
             let mut cats: Vec<String> = reg.packages.iter().filter(|p| p.games.contains(&g.id)).map(|p| p.category.clone()).filter(|c| !c.is_empty()).collect();
             cats.sort();
@@ -842,12 +1062,48 @@ async fn filters(game_id: String, st: State<'_, AppState>) -> CmdResult<serde_js
 }
 
 #[tauri::command]
-async fn browse(game_id: String, q: String, page: u32, ordering: String, section: Option<String>, categories: Vec<String>, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
+#[allow(clippy::too_many_arguments)]
+async fn browse(game_id: String, source: String, q: String, page: u32, ordering: String, section: Option<String>, categories: Vec<String>, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
     let g = find_game(&st, &game_id)?;
     let installed: HashSet<String> = st.store.lock().unwrap().data.games.get(&g.id).map(|r| r.installed.keys().cloned().collect()).unwrap_or_default();
     let base = cached_base_keys(&st, &g);
-    match &g.kind {
-        Kind::Own(_) => {
+    match source.as_str() {
+        "ts" => {
+            let c = g.ts.as_ref().ok_or("This game isn't on Thunderstore")?;
+            let (items, total, more) = thunderstore::list_filtered(&c.id, &q, page.max(1), &ordering, section.as_deref(), &categories).await.map_err(err)?;
+            let items: Vec<_> = items
+                .into_iter()
+                .map(|l| {
+                    let mut v = serde_json::to_value(&l).unwrap();
+                    v["installed"] = json!(installed.contains(&l.key));
+                    v["required"] = json!(base.contains(&l.key));
+                    v["modpack"] = json!(l.categories.iter().any(|c| c == "Modpacks"));
+                    v["source"] = json!("ts");
+                    v["pageUrl"] = json!(format!("https://thunderstore.io/c/{}/p/{}/", c.id, l.key.trim_start_matches("ts:").replacen('-', "/", 1)));
+                    v
+                })
+                .collect();
+            Ok(json!({ "items": items, "total": total, "hasMore": more }))
+        }
+        "cf" => {
+            let c = g.cf.as_ref().ok_or("This game isn't on CurseForge")?;
+            let class_id = section.as_deref().and_then(|s| s.parse::<u32>().ok());
+            let modpack_class = class_id.is_some() && section_is_modpacks(&st, c.id, class_id).await;
+            let category = categories.first().and_then(|c| c.parse::<u32>().ok());
+            let (items, total, more) = curseforge::search(&cf_key(&st), c.id, &q, page, &ordering, class_id, category, modpack_class).await.map_err(err)?;
+            let items: Vec<_> = items
+                .into_iter()
+                .map(|l| {
+                    let mut v = serde_json::to_value(&l).unwrap();
+                    v["installed"] = json!(installed.contains(&l.key));
+                    v["required"] = json!(false);
+                    v["source"] = json!("cf");
+                    v
+                })
+                .collect();
+            Ok(json!({ "items": items, "total": total, "hasMore": more }))
+        }
+        _ => {
             let reg = st.registry.lock().unwrap().clone();
             let ql = q.to_lowercase();
             let items: Vec<_> = reg
@@ -867,28 +1123,18 @@ async fn browse(game_id: String, q: String, page: u32, ordering: String, section
                         "key": key, "title": p.name, "author": p.author, "description": p.description,
                         "icon": p.icon, "version": p.version, "categories": [p.category],
                         "installed": installed.contains(&key), "required": base.contains(&key), "website": p.website,
-                        "modpack": p.install_type == "modpack",
+                        "modpack": p.install_type == "modpack", "source": "own",
                     })
                 })
                 .collect();
             Ok(json!({ "items": items, "total": items.len(), "hasMore": false }))
         }
-        Kind::Ts(c) => {
-            let (items, total, more) = thunderstore::list_filtered(c.id, &q, page.max(1), &ordering, section.as_deref(), &categories).await.map_err(err)?;
-            let items: Vec<_> = items
-                .into_iter()
-                .map(|l| {
-                    let mut v = serde_json::to_value(&l).unwrap();
-                    v["installed"] = json!(installed.contains(&l.key));
-                    v["required"] = json!(base.contains(&l.key));
-                    v["modpack"] = json!(l.categories.iter().any(|c| c == "Modpacks"));
-                    v["pageUrl"] = json!(format!("https://thunderstore.io/c/{}/p/{}/", c.id, l.key.trim_start_matches("ts:").replacen('-', "/", 1)));
-                    v
-                })
-                .collect();
-            Ok(json!({ "items": items, "total": total, "hasMore": more }))
-        }
     }
+}
+
+async fn section_is_modpacks(st: &AppState, cf_game: u32, class_id: Option<u32>) -> bool {
+    let Some(id) = class_id else { return false };
+    curseforge::classes(&cf_key(st), cf_game).await.map(|c| c.iter().any(|(i, n)| *i == id && n.to_lowercase().contains("modpack"))).unwrap_or(false)
 }
 
 #[tauri::command]
@@ -949,7 +1195,15 @@ async fn check_updates(game_id: String, st: State<'_, AppState>) -> CmdResult<Ga
     let mods: Vec<Installed> = st.store.lock().unwrap().data.games.get(&g.id).map(|r| r.installed.values().cloned().collect()).unwrap_or_default();
     let ts: Vec<String> = mods.iter().filter_map(|m| m.key.strip_prefix("ts:").map(String::from)).collect();
     let details = futures_util::future::join_all(ts.iter().map(|f| thunderstore::detail(f))).await;
+    let cf: Vec<String> = mods.iter().filter_map(|m| m.key.strip_prefix("cf:").map(String::from)).collect();
+    let key = cf_key(&st);
+    let cf_details = futures_util::future::join_all(cf.iter().map(|id| curseforge::mod_detail(&key, id))).await;
     let mut latest = st.latest.lock().unwrap();
+    for (id, d) in cf.iter().zip(cf_details) {
+        if let Ok(d) = d {
+            latest.insert(format!("{}|cf:{id}", g.id), d.version);
+        }
+    }
     for (full, d) in ts.iter().zip(details) {
         if let Ok(d) = d {
             latest.insert(format!("{}|ts:{full}", g.id), d.version);
@@ -997,14 +1251,14 @@ async fn install_file(app: AppHandle, game_id: String, st: State<'_, AppState>) 
         Layout::Root
     } else if g.id == "chained-beasts" && installer::zip_has_file(&bytes, "pack.json") {
         Layout::CfPack
+    } else if g.own.is_some() && !installer::read_manifest(&bytes).is_some() {
+        Layout::Plugin
     } else {
-        match &g.kind {
-            Kind::Own(_) => Layout::Plugin,
-            Kind::Ts(c) if c.melonloader => Layout::Melon,
-            Kind::Ts(_) => Layout::Thunderstore,
-        }
+        mod_layout(&g)
     };
-    let key = format!("local:{folder}");
+    // Plain-files games put the mod in their mods folder; everything else uses the mod's own name.
+    let folder = if layout == Layout::Folder { mods_folder(&st, &g) } else { folder };
+    let key = format!("local:{}", safe_name(&title));
     // Keep a copy so profiles can bring this mod back later.
     let _ = std::fs::create_dir_all(cache_dir(&st));
     let _ = std::fs::write(cache_file(&st, &key, &version), &bytes);
@@ -1048,11 +1302,18 @@ async fn set_game_folder(app: AppHandle, game_id: String, st: State<'_, AppState
 #[tauri::command]
 fn launch(app: AppHandle, game_id: String, vanilla: bool, st: State<'_, AppState>) -> CmdResult<()> {
     let g = find_game(&st, &game_id)?;
-    let id = *g.app_ids.first().ok_or("No Steam id for this game")?;
     // Make sure the game folder matches the Steam setting before starting.
     if let Some(root) = game_path(&st, &g) {
         apply_steam_mode(&st, &g, &root)?;
     }
+    let Some(id) = g.app_ids.first().copied() else {
+        // Not a Steam game: start its .exe directly with the same mods on/off switch.
+        let exe = g.custom.as_ref().and_then(|c| c.exe.clone()).ok_or("ModNest doesn't know how to start this game. Start it yourself.")?;
+        let args: Vec<String> = installer::launch_args(0, g.melon(), !vanilla).into_iter().skip(2).collect();
+        let args = if g.bepinex() || g.melon() { args } else { vec![] };
+        std::process::Command::new(&exe).args(&args).current_dir(Path::new(&exe).parent().unwrap_or(Path::new("."))).spawn().map_err(err)?;
+        return Ok(());
+    };
     // The launch option decides whether mods load this time, whatever the config file says.
     let args = installer::launch_args(id, g.melon(), !vanilla);
     if let Some(steam) = steam::steam_root().map(|r| r.join("steam.exe")).filter(|p| p.exists()) {
@@ -1102,9 +1363,8 @@ fn save_settings(settings: Settings, st: State<'_, AppState>) -> CmdResult<()> {
         s.save();
     }
     // Apply the Steam setting to games you've already opened in ModNest (others follow when you open them).
-    let reg = st.registry.lock().unwrap().clone();
     let opened: HashSet<String> = st.store.lock().unwrap().data.games.keys().cloned().collect();
-    for g in all_games(&reg).iter().filter(|g| opened.contains(&g.id)) {
+    for g in all_games(&st).iter().filter(|g| opened.contains(&g.id)) {
         if let Some(root) = game_path(&st, g) {
             let _ = apply_steam_mode(&st, g, &root);
         }
@@ -1222,7 +1482,7 @@ fn export_profile(game_id: String, name: String, st: State<'_, AppState>) -> Cmd
 #[tauri::command]
 async fn share_thunderstore(game_id: String, name: String, st: State<'_, AppState>) -> CmdResult<String> {
     let g = find_game(&st, &game_id)?;
-    if !matches!(g.kind, Kind::Ts(_)) {
+    if g.ts.is_none() {
         return Err("Thunderstore codes only work for Thunderstore games. Use the ModNest code instead.".into());
     }
     let mods = profile_mods(&st, &g, &name)?;
@@ -1247,20 +1507,24 @@ async fn import_code(code: String, game_id: String, st: State<'_, AppState>) -> 
 
 /// Profiles saved by Thunderstore Mod Manager / r2modman on this PC.
 #[tauri::command]
-fn manager_profiles() -> Vec<serde_json::Value> {
-    profiles::local_manager_profiles()
+fn manager_profiles(st: State<'_, AppState>) -> Vec<serde_json::Value> {
+    let games = all_games(&st);
+    profiles::local_manager_profiles(&st.communities.lock().unwrap().clone())
         .into_iter()
-        .map(|(c, name, mods)| json!({ "gameId": format!("ts-{c}"), "name": name, "count": mods.len(), "mods": mods.iter().map(|m| m.title.clone()).collect::<Vec<_>>() }))
+        .filter_map(|(c, name, mods)| {
+            let g = games.iter().find(|g| g.ts.as_ref().map(|t| t.id == c).unwrap_or(false))?;
+            Some(json!({ "gameId": g.id, "gameName": g.name, "name": name, "count": mods.len(), "mods": mods.iter().map(|m| m.title.clone()).collect::<Vec<_>>() }))
+        })
         .collect()
 }
 
 #[tauri::command]
 fn import_manager_profile(game_id: String, name: String, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
     let g = find_game(&st, &game_id)?;
-    let community = game_id.trim_start_matches("ts-");
-    let (_, _, mods) = profiles::local_manager_profiles()
+    let community = g.ts.as_ref().map(|t| t.id.clone()).ok_or("This game isn't on Thunderstore")?;
+    let (_, _, mods) = profiles::local_manager_profiles(&st.communities.lock().unwrap().clone())
         .into_iter()
-        .find(|(c, n, _)| c == community && *n == name)
+        .find(|(c, n, _)| *c == community && *n == name)
         .ok_or("That profile isn't there any more.")?;
     let name = unique_name(&st, &g, &name);
     put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
@@ -1274,10 +1538,182 @@ async fn install_modpack(app: AppHandle, game_id: String, key: String, title: St
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
     let name = unique_name(&st, &g, &title);
-    put_profile(&st, &g, Profile { name: name.clone(), mods: vec![ProfileMod { key: key.clone(), title, version: String::new(), enabled: true }], modpack: Some(key), updated: now() });
+    // A CurseForge modpack is a zip listing its mods (manifest.json); its profile holds those mods.
+    // Thunderstore and ModNest modpacks are packages whose dependencies are the mods.
+    let mods = if let Some(id) = key.strip_prefix("cf:") {
+        let m = curseforge::mod_detail(&cf_key(&st), id).await.map_err(err)?;
+        let url = m.download.clone().ok_or_else(|| format!("{}'s author only allows downloading it from the CurseForge website.", m.title))?;
+        let bytes = installer::download(&url, |_| {}).await.map_err(err)?;
+        let list = curseforge::modpack_mods(&bytes).map_err(|e| format!("{} isn't a modpack ModNest can read: {e}", m.title))?;
+        list.into_iter().map(|k| ProfileMod { key: k, title: String::new(), version: String::new(), enabled: true }).collect()
+    } else {
+        vec![ProfileMod { key: key.clone(), title, version: String::new(), enabled: true }]
+    };
+    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: Some(key), updated: now() });
     let failed = apply_inner(&app, &st, &g, &name).await?;
     sync_active(&st, &g);
     Ok(Applied { state: state_of(&st, &g), failed })
+}
+
+// ---------- commands: CurseForge key, games added by hand, My stuff ----------
+
+/// Saves the CurseForge API key after checking it works, then loads CurseForge's games.
+#[tauri::command]
+async fn set_curseforge_key(key: String, st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
+    let key = key.trim().to_string();
+    let count = if key.is_empty() { 0 } else { curseforge::test_key(&key).await.map_err(err)? };
+    {
+        let mut s = st.store.lock().unwrap();
+        s.data.settings.curseforge_key = key;
+        s.save();
+    }
+    load_cf_games(&st).await?;
+    let games: Vec<GameView> = all_games(&st).iter().map(|g| view(&st, g)).collect();
+    Ok(json!({ "games": games, "curseforgeGames": count }))
+}
+
+/// Works out which mod loader a game folder uses (or would need).
+fn detect_loader(root: &Path) -> &'static str {
+    let has = |p: &str| root.join(p).exists();
+    if has("BepInEx/core/BepInEx.Unity.IL2CPP.dll") {
+        return "bepinex6-il2cpp";
+    }
+    if has("BepInEx/core/BepInEx.dll") || has("BepInEx/core/BepInEx.Preloader.dll") {
+        return "bepinex5";
+    }
+    if has("MelonLoader") || has("version.dll") && has("MelonLoader") {
+        return "melonloader";
+    }
+    // A Unity game without a loader yet: IL2CPP builds need BepInEx 6, Mono builds BepInEx 5.
+    if has("GameAssembly.dll") {
+        return "bepinex6-il2cpp";
+    }
+    let mono = std::fs::read_dir(root).ok().map(|rd| rd.flatten().any(|e| e.file_name().to_string_lossy().ends_with("_Data") && e.path().join("Managed").exists())).unwrap_or(false);
+    if mono || has("MonoBleedingEdge") {
+        return "bepinex5";
+    }
+    "none"
+}
+
+fn find_exe(root: &Path) -> Option<String> {
+    let skip = ["unitycrashhandler", "unins", "crashreport", "launcher_helper", "vc_redist", "dxsetup"];
+    std::fs::read_dir(root)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().map(|x| x.eq_ignore_ascii_case("exe")).unwrap_or(false))
+        .filter(|p| {
+            let n = p.file_name().unwrap().to_string_lossy().to_ascii_lowercase();
+            !skip.iter().any(|s| n.starts_with(s))
+        })
+        .max_by_key(|p| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0))
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NewGame {
+    name: String,
+    /// auto | bepinex5 | bepinex6-il2cpp | melonloader | none
+    loader: String,
+    #[serde(default)]
+    mods_folder: String,
+    #[serde(default)]
+    thunderstore: Option<String>,
+    #[serde(default)]
+    curseforge: Option<u32>,
+}
+
+/// Adds any game by folder. Asks for the folder, then fills in what it can work out.
+#[tauri::command]
+async fn add_custom_game(app: AppHandle, game: NewGame, st: State<'_, AppState>) -> CmdResult<Option<GameView>> {
+    let Some(dir) = app.dialog().file().set_title("Pick the game's folder (where its .exe is)").blocking_pick_folder() else {
+        return Ok(None);
+    };
+    let path = dir.into_path().map_err(err)?;
+    let name = if game.name.trim().is_empty() { path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "My game".into()) } else { game.name.trim().to_string() };
+    let loader = if game.loader == "auto" || game.loader.is_empty() { detect_loader(&path).to_string() } else { game.loader.clone() };
+    let steam_app_id = st.steam.lock().unwrap().iter().find(|(_, s)| s.path == path).map(|(id, _)| *id);
+    let slug: String = squash(&name);
+    let id = {
+        let s = st.store.lock().unwrap();
+        let taken = |i: &str| s.data.custom_games.iter().any(|c| c.id == i);
+        let base = format!("custom-{}", if slug.is_empty() { "game".into() } else { slug });
+        if !taken(&base) { base.clone() } else { (2..).map(|n| format!("{base}-{n}")).find(|i| !taken(i)).unwrap() }
+    };
+    let c = store::CustomGame {
+        id: id.clone(),
+        name,
+        path: path.to_string_lossy().to_string(),
+        loader,
+        mods_folder: game.mods_folder.trim().trim_matches(['/', '\\']).to_string(),
+        thunderstore: game.thunderstore.filter(|t| !t.is_empty()),
+        curseforge: game.curseforge,
+        exe: find_exe(&path),
+        steam_app_id,
+    };
+    {
+        let mut s = st.store.lock().unwrap();
+        s.data.custom_games.push(c);
+        s.save();
+    }
+    let g = find_game(&st, &id)?;
+    Ok(Some(view(&st, &g)))
+}
+
+/// Removes a game added by hand from ModNest (its files and mods are left alone).
+#[tauri::command]
+fn remove_custom_game(game_id: String, st: State<'_, AppState>) -> CmdResult<()> {
+    let mut s = st.store.lock().unwrap();
+    s.data.custom_games.retain(|c| c.id != game_id);
+    s.data.games.remove(&game_id);
+    s.save();
+    Ok(())
+}
+
+/// Where plain mod files go for this game (CurseForge mods for games without a loader).
+#[tauri::command]
+fn set_mods_folder(game_id: String, folder: String, st: State<'_, AppState>) -> CmdResult<GameState> {
+    let g = find_game(&st, &game_id)?;
+    {
+        let mut s = st.store.lock().unwrap();
+        s.game(&g.id).mods_folder = Some(folder.trim().trim_matches(['/', '\\']).replace('\\', "/"));
+        s.save();
+    }
+    Ok(state_of(&st, &g))
+}
+
+/// Everything that's yours: profiles across all games, and what you've published in the ModNest catalog.
+#[tauri::command]
+fn my_stuff(st: State<'_, AppState>) -> serde_json::Value {
+    let games = all_games(&st);
+    let records = st.store.lock().unwrap().data.games.clone();
+    let mut profiles = Vec::new();
+    for (gid, rec) in records.iter().filter(|(_, r)| !r.profiles.is_empty()) {
+        let Some(g) = games.iter().find(|g| &g.id == gid) else { continue };
+        let v = view(&st, g);
+        let list: Vec<_> = rec
+            .profiles
+            .values()
+            .map(|p| json!({ "name": p.name, "count": p.mods.len(), "active": rec.active_profile.as_deref() == Some(p.name.as_str()), "modpack": p.modpack, "mods": p.mods.iter().map(|m| if m.title.is_empty() { m.key.clone() } else { m.title.clone() }).collect::<Vec<_>>() }))
+            .collect();
+        profiles.push(json!({ "gameId": g.id, "gameName": g.name, "capsule": v.capsule, "profiles": list }));
+    }
+    let reg = st.registry.lock().unwrap().clone();
+    let published: Vec<_> = reg
+        .games
+        .iter()
+        .map(|g| {
+            let pk: Vec<_> = reg
+                .packages
+                .iter()
+                .filter(|p| p.games.contains(&g.id) && p.install_type != "root")
+                .map(|p| json!({ "id": p.id, "name": p.name, "version": p.version, "kind": if p.install_type == "modpack" { "Modpack" } else if p.install_type == "cf-pack" { "Pack" } else { "Mod" }, "icon": p.icon, "description": p.description }))
+                .collect();
+            json!({ "gameId": g.id, "gameName": g.name, "packages": pk })
+        })
+        .collect();
+    json!({ "profiles": profiles, "published": published, "repo": "https://github.com/104316stu/modnest" })
 }
 
 // ---------- app self-update (GitHub Releases) ----------
@@ -1340,6 +1776,8 @@ pub fn run() {
                 registry: Mutex::new(Registry::bundled()),
                 steam: Mutex::new(HashMap::new()),
                 latest: Mutex::new(HashMap::new()),
+                communities: Mutex::new(thunderstore::known()),
+                cf_games: Mutex::new(Vec::new()),
                 busy: tauri::async_runtime::Mutex::new(()),
                 data_dir,
             });
@@ -1375,6 +1813,11 @@ pub fn run() {
             manager_profiles,
             import_manager_profile,
             install_modpack,
+            set_curseforge_key,
+            add_custom_game,
+            remove_custom_game,
+            set_mods_folder,
+            my_stuff,
             check_app_update,
             install_app_update
         ])

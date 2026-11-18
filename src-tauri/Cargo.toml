@@ -1,6 +1,6 @@
 [package]
 name = "modnest"
-version = "0.1.0"
+version = "0.2.0"
 description = "ModNest mod manager"
 edition = "2021"
 default-run = "modnest"

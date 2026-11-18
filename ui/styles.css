@@ -256,3 +256,17 @@ textarea.input { height: auto; padding: 8px 12px; resize: vertical; font-family:
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 99px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Add a game / My stuff ---------- */
+.add-card { background: transparent; border: 2px dashed var(--line); }
+.add-card:hover { border-color: var(--accent); box-shadow: none; }
+.add-card .add-plus { position: absolute; inset: 0 0 30% 0; display: grid; place-items: center; font-size: 46px; font-weight: 300; color: var(--muted); }
+.add-card:hover .add-plus { color: var(--accent-hi); }
+.add-card .meta .name { color: var(--strong); text-shadow: none; }
+.add-card .meta .sub { color: var(--muted); }
+.mine-game { margin-bottom: 14px; }
+.mine-head { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 0; color: var(--strong); font-weight: 700; font-size: 15px; }
+.mine-head img { width: 30px; height: 45px; border-radius: 5px; object-fit: cover; background: var(--surface-2); }
+.mine-head:hover span:first-of-type { color: var(--accent-hi); }
+.modal .field label { font-size: 13px; }
+.modal code { background: var(--surface-3); padding: 0 4px; border-radius: 4px; font-size: 12px; }

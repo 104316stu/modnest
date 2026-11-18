@@ -29,7 +29,9 @@ const I = {
   gear: svg('M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.4zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z'),
   layers: svg('M12 16.5 3.7 10 2 11.3l10 7.8 10-7.8-1.7-1.3zm0-2.6 8.3-6.4L22 6.2 12-1.6 2 6.2l1.6 1.3z'),
   check: svg('M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z', 'tick'),
+  person: svg('M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-3.3 0-10 1.7-10 5v3h20v-3c0-3.3-6.7-5-10-5z'),
 };
+const SOURCE_NAME = { own: 'ModNest', ts: 'Thunderstore', cf: 'CurseForge' };
 
 const ui = {
   view: 'library', // library | game
@@ -49,6 +51,7 @@ const ui = {
   busy: new Set(),
   autoDone: new Set(),
   menu: null,
+  sourceFor: {},
 };
 
 // ---------- feedback ----------
@@ -109,6 +112,7 @@ function renderRail() {
     <img class="rail-logo" src="logo.png" alt="ModNest" title="ModNest" />
     <div class="rail-sep"></div>
     <button class="rail-btn ${ui.view === 'library' ? 'active' : ''}" data-act="library" title="Library">${I.library}</button>
+    <button class="rail-btn ${ui.view === 'mine' ? 'active' : ''}" data-act="my-stuff" title="My stuff: profiles and your published mods">${I.person}</button>
     <div class="rail-games">${mine.map((g) => `
       <button class="rail-btn ${ui.view === 'game' && ui.gameId === g.id ? 'active' : ''}" data-game="${esc(g.id)}" title="${esc(g.name)}">
         <img src="${esc(g.capsule || g.cover || '')}" alt="" />
@@ -139,21 +143,30 @@ function renderLibrary() {
       <div class="meta"><div class="name">${esc(g.name)}</div><div class="sub">${g.installed ? esc(g.loader) : 'Not installed'}</div></div>
     </button>`;
   const own = list.filter((g) => g.source === 'own');
-  const ts = list.filter((g) => g.source !== 'own');
+  const custom = list.filter((g) => g.source === 'custom');
+  const ts = list.filter((g) => g.source === 'thunderstore');
+  const cf = list.filter((g) => g.source === 'curseforge');
+  const total = ui.games.length;
+  const addCard = `<button class="cover-card add-card" data-act="add-game" title="Add any game by its folder">
+      <div class="add-plus">+</div><div class="meta"><div class="name">Add a game</div><div class="sub">Any game, any folder</div></div></button>`;
+  const group = (title, pill, games, extra = '') => (games.length || extra ? `<div class="group-title">${title} ${pill ? `<span class="pill line">${pill}</span>` : ''}</div><div class="cover-grid">${games.map(card).join('')}${extra}</div>` : '');
   $('#main').innerHTML = `
     <div class="lib-head">
-      <div><h1>Library</h1><p>Pick a game to manage its mods.</p></div>
+      <div><h1>Library</h1><p>${ui.libScope === 'mine' ? 'Your installed games that have mods.' : `${total} games you can mod with ModNest.`}</p></div>
       <span style="flex:1"></span>
       <div class="seg">
         <button data-scope="mine" class="${ui.libScope === 'mine' ? 'active' : ''}">Installed</button>
         <button data-scope="all" class="${ui.libScope === 'all' ? 'active' : ''}">All supported</button>
       </div>
     </div>
-    <div class="lib-tools"><label class="search">${I.search}<input class="input" type="search" id="lib-filter" placeholder="Search games" value="${esc(ui.libFilter)}" autocomplete="off" /></label></div>
+    <div class="lib-tools"><label class="search">${I.search}<input class="input" type="search" id="lib-filter" placeholder="Search ${total} games" value="${esc(ui.libFilter)}" autocomplete="off" /></label></div>
     <div class="scroll">
-      ${own.length ? `<div class="group-title">Your mods <span class="pill line">ModNest catalog</span></div><div class="cover-grid">${own.map(card).join('')}</div>` : ''}
-      ${ts.length ? `<div class="group-title">Community mods <span class="pill line">from Thunderstore</span></div><div class="cover-grid">${ts.map(card).join('')}</div>` : ''}
-      ${!list.length ? '<div class="empty">No games found. Try “All supported”.</div>' : ''}
+      ${group('Your mods', 'ModNest catalog', own)}
+      ${group('Added by you', '', custom, f ? '' : addCard)}
+      ${group('Thunderstore', `${ts.length} games`, ts)}
+      ${group('CurseForge', `${cf.length} games`, cf)}
+      ${!list.length ? `<div class="empty">No games found${ui.libScope === 'mine' ? '. Try “All supported”' : ''}. Not listed? <a href="#" data-act="add-game" style="color:var(--accent-hi)">Add it yourself</a>.</div>` : ''}
+      ${ui.libScope === 'all' && !cf.length && !ui.settings.curseforgeKey ? `<div class="note blue" style="margin:10px 32px"><span>Add a free CurseForge API key to see CurseForge games and mods here too.</span><button class="btn sm" data-act="settings">Add key</button></div>` : ''}
       <div style="height:24px"></div>
     </div>`;
   const input = $('#lib-filter');
@@ -223,6 +236,7 @@ function renderGame() {
           <h1>${esc(g.name)}</h1>
           <div class="chips">
             <span class="pill">${esc(g.loader)}</span>
+            ${g.sources.map((x) => `<span class="pill line">${SOURCE_NAME[x]}</span>`).join('')}
             ${g.installed ? (ui.state.baseMissing.length ? '<span class="pill amber">Loader not set up</span>' : '<span class="pill green">Ready</span>') : '<span class="pill red">Game not found</span>'}
             ${updates ? `<span class="pill amber">${plural(updates, 'update')}</span>` : ''}
             ${ui.state.steamSwitchable ? `<span class="pill line" title="What happens when you start the game from Steam">${ui.state.steamVanilla ? 'Steam starts it without mods' : 'Steam starts it with mods'}</span>` : ''}
@@ -234,8 +248,8 @@ function renderGame() {
             ${ui.menu === 'profile' ? profileMenu() : ''}
           </div>
           <div class="play-split">
-            <button class="btn play" data-act="play" ${g.installed && g.appId ? '' : 'disabled'}>${I.play.replace('<svg', '<svg width="16" height="16"')} Play</button>
-            <button class="btn play-more" data-act="play-menu" ${g.installed && g.appId ? '' : 'disabled'} title="More">${I.caret.replace('<svg', '<svg width="18" height="18"')}</button>
+            <button class="btn play" data-act="play" ${g.installed && (g.appId || g.custom?.exe) ? '' : 'disabled'}>${I.play.replace('<svg', '<svg width="16" height="16"')} Play</button>
+            <button class="btn play-more" data-act="play-menu" title="More">${I.caret.replace('<svg', '<svg width="18" height="18"')}</button>
             ${ui.menu === 'play' ? `<div class="menu-pop">
               <button data-act="play-vanilla">${I.play.replace('<svg', '<svg width="14" height="14"')} Play without mods</button>
               ${ui.state.steamSwitchable ? `<hr/><div class="label">Starting from Steam</div>
@@ -244,7 +258,8 @@ function renderGame() {
               <hr/>
               <button data-act="file">Install mod from file…</button>
               <button data-act="open-folder">Open game folder</button>
-              ${g.installed ? '' : '<button data-act="folder">Set game folder…</button>'}
+              ${g.installed || g.custom ? '' : '<button data-act="folder">Set game folder…</button>'}
+              <button data-act="game-settings">Game settings…</button>
             </div>` : ''}
           </div>
         </div>
@@ -342,28 +357,46 @@ function renderInstalled(c) {
 }
 
 // ---------- Browse & Modpacks ----------
+// The catalog Browse/Modpacks shows: the one you picked for this game, else the first available.
+function currentSource() {
+  const srcs = ui.state.game.sources;
+  const picked = ui.sourceFor[ui.gameId];
+  return srcs.includes(picked) ? picked : srcs[0] || null;
+}
 function browseFor(tab) {
-  if (!ui.browse || ui.browse.tab !== tab) ui.browse = { tab, q: '', ordering: 'most-downloaded', category: '', page: 1, items: [], total: 0, hasMore: false, loading: false, loaded: false };
+  const source = currentSource();
+  if (!ui.browse || ui.browse.tab !== tab || ui.browse.source !== source) {
+    ui.browse = { tab, source, q: '', ordering: 'most-downloaded', category: '', page: 1, items: [], total: 0, hasMore: false, loading: false, loaded: false, error: '' };
+  }
   return ui.browse;
 }
-async function loadFilters() {
-  if (!ui.filters[ui.gameId]) {
-    try { ui.filters[ui.gameId] = await invoke('filters', { gameId: ui.gameId }); } catch { ui.filters[ui.gameId] = { sections: [], categories: [] }; }
+async function loadFilters(source) {
+  const k = ui.gameId + '|' + source;
+  if (!ui.filters[k]) {
+    try { ui.filters[k] = await invoke('filters', { gameId: ui.gameId, source }); } catch { return { sections: [], categories: [] }; }
   }
-  return ui.filters[ui.gameId];
+  return ui.filters[k];
 }
 
 function renderBrowse(c) {
+  const g = ui.state.game;
   const b = browseFor(ui.tab);
   const packs = ui.tab === 'modpacks';
-  const isTs = ui.state.game.source !== 'own';
-  const cats = (ui.filters[ui.gameId] || {}).categories || [];
+  const source = b.source;
   const grid = ui.layout === 'grid';
+  if (!source) {
+    c.innerHTML = `<div class="empty">There's no online catalog for ${esc(g.name)}.<br/>
+      Install mods from a file (Play ▾ → Install mod from file), or link it to a Thunderstore or CurseForge game in <a href="#" data-act="game-settings" style="color:var(--accent-hi)">Game settings</a>.</div>`;
+    return;
+  }
+  const cats = (ui.filters[ui.gameId + '|' + source] || {}).categories || [];
+  const sorts = source === 'own' ? [] : [['most-downloaded', 'Most downloaded'], ['top-rated', source === 'cf' ? 'Top rated' : 'Most liked'], ['last-updated', 'Recently updated'], ['newest', 'Newest']];
+  const needsKey = source === 'cf' && !ui.settings.curseforgeKey;
   c.innerHTML = `
     <div class="toolbar">
-      <label class="search">${I.search}<input class="input" type="search" id="b-q" placeholder="Search ${packs ? 'modpacks' : 'mods'}" value="${esc(b.q)}" autocomplete="off" /></label>
-      ${isTs ? `<select class="input" id="b-sort">${[['most-downloaded', 'Most downloaded'], ['top-rated', 'Most liked'], ['last-updated', 'Recently updated'], ['newest', 'Newest']]
-        .map(([v, l]) => `<option value="${v}" ${b.ordering === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
+      ${g.sources.length > 1 ? `<div class="seg">${g.sources.map((x) => `<button data-source="${x}" class="${x === source ? 'active' : ''}">${SOURCE_NAME[x]}</button>`).join('')}</div>` : ''}
+      <label class="search">${I.search}<input class="input" type="search" id="b-q" placeholder="Search ${SOURCE_NAME[source]} ${packs ? 'modpacks' : 'mods'}" value="${esc(b.q)}" autocomplete="off" /></label>
+      ${sorts.length ? `<select class="input" id="b-sort">${sorts.map(([v, l]) => `<option value="${v}" ${b.ordering === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : ''}
       ${cats.length && !packs ? `<select class="input" id="b-cat"><option value="">All categories</option>${cats.map((k) => `<option value="${esc(k.id)}" ${b.category === k.id ? 'selected' : ''}>${esc(k.name)}</option>`).join('')}</select>` : ''}
       <div class="view-toggle">
         <button data-layout="list" class="${grid ? '' : 'active'}" title="List">${I.list}</button>
@@ -371,22 +404,26 @@ function renderBrowse(c) {
       </div>
       ${b.total ? `<span class="count">${fmt(b.total)} ${packs ? 'modpacks' : 'mods'}</span>` : ''}
     </div>
-    ${packs ? `<div class="note blue"><span>A modpack installs as its own profile. Your current mods stay saved in “${esc(ui.state.game.activeProfile || 'Default')}”, one click away.</span></div>` : notes()}
+    ${needsKey ? `<div class="note blue"><span>CurseForge needs a free API key before ModNest can search it.</span><button class="btn sm primary" data-act="settings">Add key</button></div>`
+      : packs ? `<div class="note blue"><span>A modpack installs as its own profile. Your current mods stay saved in “${esc(g.activeProfile || 'Default')}”, one click away.</span></div>` : notes()}
     <div id="b-list">${grid ? `<div class="cards">${b.items.map((m) => browseCard(m, packs)).join('')}</div>` : `<div class="rows">${b.items.map((m) => browseRow(m, packs)).join('')}</div>`}</div>
     ${b.loading ? '<div class="more"><div class="spinner"></div></div>' : b.hasMore ? '<div class="more"><button class="btn" data-act="more">Load more</button></div>' : ''}
-    ${!b.loading && b.loaded && !b.items.length ? `<div class="empty">No ${packs ? 'modpacks' : 'mods'} found.</div>` : ''}`;
+    ${!b.loading && b.loaded && !b.items.length && !needsKey ? `<div class="empty">${b.error ? esc(b.error) : `No ${packs ? 'modpacks' : 'mods'} found on ${SOURCE_NAME[source]}.`}</div>` : ''}`;
   const input = $('#b-q');
   let t;
   input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { b.q = input.value.trim(); loadBrowse(true); }, 350); });
   $('#b-sort')?.addEventListener('change', (e) => { b.ordering = e.target.value; loadBrowse(true); });
   $('#b-cat')?.addEventListener('change', (e) => { b.category = e.target.value; loadBrowse(true); });
-  if (!b.loaded && !b.loading) loadBrowse(true);
+  if (!b.loaded && !b.loading && !needsKey) loadBrowse(true);
 }
 
 function getButton(m, packs, small = true) {
   const busy = ui.busy.has(m.key);
   const can = ui.state.game.installed && !busy;
   if (m.installed) return '<span class="pill green">Installed</span>';
+  if (m.downloadable === false) {
+    return `<button class="btn ${small ? 'sm' : ''}" data-act="link" data-url="${esc(m.pageUrl || '')}" title="The author only allows downloads from the CurseForge website">On CurseForge ↗</button>`;
+  }
   const label = busy ? '<span class="spinner sm"></span>' : packs ? 'Install as profile' : `${I.dl.replace('<svg', '<svg width="14" height="14"')} Get`;
   return `<button class="btn ${small ? 'sm' : ''} primary" data-act="${packs ? 'install-pack' : 'install'}" data-key="${esc(m.key)}" data-title="${esc(m.title)}" ${can ? '' : 'disabled'}>${label}</button>`;
 }
@@ -438,20 +475,20 @@ function browseCard(m, packs) {
 async function loadBrowse(reset) {
   const b = ui.browse;
   const gameId = ui.gameId;
-  const filters = await loadFilters();
-  if (reset) { b.page = 1; b.items = []; }
+  const filters = await loadFilters(b.source);
+  if (reset) { b.page = 1; b.items = []; b.error = ''; }
   b.loading = true;
   if (reset) renderTab();
   try {
-    const own = ui.state.game.source === 'own';
     const slug = b.tab === 'modpacks' ? 'modpacks' : 'mods';
-    const section = own ? slug : (filters.sections.find((s) => s.slug === slug) || {}).id || null;
-    const r = await invoke('browse', { gameId, q: b.q, page: b.page, ordering: b.ordering, section, categories: b.category ? [b.category] : [] });
+    const section = b.source === 'own' ? slug : (filters.sections.find((s) => s.slug === slug) || {}).id || null;
+    if (b.tab === 'modpacks' && b.source !== 'own' && !section) throw `${SOURCE_NAME[b.source]} has no modpacks for this game.`;
+    const r = await invoke('browse', { gameId, source: b.source, q: b.q, page: b.page, ordering: b.ordering, section, categories: b.category ? [b.category] : [] });
     if (gameId !== ui.gameId || ui.browse !== b) return;
     b.items = reset ? r.items : b.items.concat(r.items);
     b.hasMore = r.hasMore;
     b.total = r.total;
-  } catch (e) { fail(e); }
+  } catch (e) { b.error = String(e); }
   b.loading = false;
   b.loaded = true;
   if (ui.browse === b && ui.view === 'game' && (ui.tab === 'browse' || ui.tab === 'modpacks')) {
@@ -544,20 +581,141 @@ async function settingsDialog() {
     <label class="check"><input type="checkbox" id="set-loader" ${ui.settings.autoInstallLoader ? 'checked' : ''} />
       <span><b>Set up the mod loader automatically</b><br/><small class="muted">Your games (Chained Beasts, Iron Nest) get BepInEx and ChainedForge when you open them. Other games get theirs with the first mod you install.</small></span></label>
     <label class="check"><input type="checkbox" id="set-steam" ${ui.settings.steamVanilla ? 'checked' : ''} />
-      <span><b>Mods only when started from ModNest</b><br/><small class="muted">Starting a game from Steam runs the normal game; ModNest's Play button runs it with mods. Change it per game in the Play menu. (BepInEx games; Schedule I always runs with mods.)</small></span></label>
+      <span><b>Mods only when started from ModNest</b><br/><small class="muted">Starting a game from Steam runs the normal game; ModNest's Play button runs it with mods. Change it per game in the Play menu. (BepInEx games only.)</small></span></label>
     <label class="check"><input type="checkbox" id="set-update" ${ui.settings.autoUpdateMods ? 'checked' : ''} />
       <span><b>Keep mods up to date</b><br/><small class="muted">When you open a game, its mods update to the newest version.</small></span></label>
+    <div class="field" style="margin:14px 0 6px">
+      <label><b>CurseForge API key</b> <small class="muted">· needed to browse CurseForge</small></label>
+      <input class="input" type="text" id="set-cf" value="${esc(ui.settings.curseforgeKey || '')}" placeholder="Paste your key" autocomplete="off" spellcheck="false" />
+      <small class="muted">Free: sign in at <a href="#" data-url="https://console.curseforge.com/" class="ext" style="color:var(--accent-hi)">console.curseforge.com</a>, open <b>API keys</b>, copy yours and paste it here. It stays on this PC.</small>
+    </div>
     <p class="muted small">Downloads are kept so switching profiles is instant. <a href="#" id="clear-cache" style="color:var(--accent-hi)">Clear download cache</a></p>
-    <p class="muted small">ModNest v${esc(ui.version)} updates itself from GitHub. Mods download straight from GitHub or Thunderstore; nothing goes through a server of ours.</p>
+    <p class="muted small">ModNest v${esc(ui.version)} updates itself from GitHub. Mods download straight from GitHub, Thunderstore or CurseForge; nothing goes through a server of ours.</p>
   </section><footer><button class="btn" value="">Cancel</button><button class="btn primary" value="ok">Save</button></footer>`);
-  if (r === 'ok') {
-    ui.settings = { autoInstallLoader: $('#set-loader').checked, autoUpdateMods: $('#set-update').checked, steamVanilla: $('#set-steam').checked };
-    try {
-      await invoke('save_settings', { settings: ui.settings });
-      if (ui.view === 'game') setState(await invoke('game_state', { gameId: ui.gameId }));
-    } catch (e) { fail(e); }
-  }
+  if (r !== 'ok') return;
+  const key = $('#set-cf').value.trim();
+  const keyChanged = key !== (ui.settings.curseforgeKey || '');
+  ui.settings = { ...ui.settings, autoInstallLoader: $('#set-loader').checked, autoUpdateMods: $('#set-update').checked, steamVanilla: $('#set-steam').checked };
+  try {
+    await invoke('save_settings', { settings: ui.settings });
+    if (keyChanged) {
+      toast('cf', key ? 'Checking your CurseForge key…' : 'Removing CurseForge…', { fraction: -1 });
+      const r2 = await invoke('set_curseforge_key', { key });
+      ui.settings.curseforgeKey = key;
+      ui.games = r2.games;
+      ui.filters = {};
+      ui.browse = null;
+      toast('cf', key ? `CurseForge connected: ${r2.curseforgeGames} games` : 'CurseForge removed', { kind: 'ok', ttl: 4000 });
+      renderRail();
+    }
+    if (ui.view === 'game') setState(await invoke('game_state', { gameId: ui.gameId }));
+    else if (ui.view === 'library') renderLibrary();
+  } catch (e) { toast('cf', 'CurseForge key not saved', { text: String(e), kind: 'error', ttl: 9000 }); }
 }
+
+// ---------- Add a game / Game settings ----------
+function gameOptions(list, selected, none) {
+  return `<option value="">${none}</option>` + list.map((x) => `<option value="${esc(x.v)}" ${x.v === selected ? 'selected' : ''}>${esc(x.n)}</option>`).join('');
+}
+async function addGameDialog() {
+  const tsGames = ui.games.filter((g) => g.sources.includes('ts')).map((g) => ({ v: g.tsId || '', n: g.name })).filter((x) => x.v);
+  const r = await modal(`<header>Add a game</header><section>
+    <p class="muted small" style="margin-top:0">For games ModNest doesn't list. After you click <b>Pick folder</b>, choose the folder that has the game's .exe in it.</p>
+    <div class="field"><label>Name</label><input class="input" type="text" id="ng-name" placeholder="My Game" autocomplete="off" /></div>
+    <div class="field" style="margin-top:10px"><label>Mod loader</label>
+      <select class="input" id="ng-loader">
+        <option value="auto" selected>Work it out for me</option>
+        <option value="bepinex5">BepInEx 5 (most Unity games)</option>
+        <option value="bepinex6-il2cpp">BepInEx 6 IL2CPP (newer Unity games)</option>
+        <option value="melonloader">MelonLoader</option>
+        <option value="none">None: copy mod files into a folder</option>
+      </select></div>
+    <div class="field" style="margin-top:10px"><label>Mods folder <small class="muted">(only for “None”, e.g. <code>Mods</code> or <code>Content/Paks/~mods</code>)</small></label>
+      <input class="input" type="text" id="ng-folder" placeholder="leave empty for the game folder" autocomplete="off" /></div>
+    <div class="field" style="margin-top:10px"><label>Get mods from Thunderstore <small class="muted">(optional)</small></label>
+      <input class="input" type="text" id="ng-ts" list="ng-ts-list" placeholder="Type a Thunderstore game name" autocomplete="off" />
+      <datalist id="ng-ts-list">${tsGames.map((x) => `<option value="${esc(x.n)}"></option>`).join('')}</datalist></div>
+  </section><footer><button class="btn" value="">Cancel</button><button class="btn primary" value="ok">Pick folder…</button></footer>`);
+  if (r !== 'ok') return;
+  const tsName = $('#ng-ts').value.trim().toLowerCase();
+  const ts = tsGames.find((x) => x.n.toLowerCase() === tsName);
+  const game = { name: $('#ng-name').value, loader: $('#ng-loader').value, modsFolder: $('#ng-folder').value, thunderstore: ts ? ts.v : null, curseforge: null };
+  try {
+    const v = await invoke('add_custom_game', { game });
+    if (!v) return;
+    ui.games.push(v);
+    toast('ng', `Added ${v.name}`, { text: `Mod loader: ${v.loader}`, kind: 'ok', ttl: 4000 });
+    openGame(v.id);
+  } catch (e) { fail(e); }
+}
+async function gameSettingsDialog() {
+  const g = ui.state.game;
+  const plainFiles = !['BepInEx', 'BepInEx 5', 'BepInEx 6 IL2CPP', 'MelonLoader'].includes(g.loader) && !g.loader.startsWith('BepInEx');
+  const r = await modal(`<header>${esc(g.name)} settings</header><section>
+    <p class="small" style="margin-top:0"><b>Folder:</b> <span class="muted selectable">${esc(g.path || 'not found')}</span><br/><b>Mod loader:</b> <span class="muted">${esc(g.loader)}</span><br/>
+    <b>Mods from:</b> <span class="muted">${g.sources.length ? g.sources.map((x) => SOURCE_NAME[x]).join(', ') : 'files only'}</span></p>
+    <div class="field"><label>Mods folder <small class="muted">· where plain mod files go${plainFiles ? '' : ' (not used with a mod loader)'}</small></label>
+      <input class="input" type="text" id="gs-folder" value="${esc(g.modsFolder || '')}" placeholder="the game folder itself" autocomplete="off" /></div>
+    ${g.custom ? '<p class="muted small">This game was added by you. Removing it only takes it out of ModNest; its files and mods stay.</p>' : ''}
+  </section><footer>${g.custom ? '<button class="btn danger" value="remove" style="margin-right:auto">Remove from ModNest</button>' : ''}<button class="btn" value="">Cancel</button><button class="btn primary" value="ok">Save</button></footer>`);
+  try {
+    if (r === 'ok') {
+      setState(await invoke('set_mods_folder', { gameId: g.id, folder: $('#gs-folder').value }));
+      toast('gs', 'Saved', { kind: 'ok', ttl: 2000 });
+    } else if (r === 'remove') {
+      if (!(await confirmBox('Remove game', `<p>Take <b>${esc(g.name)}</b> out of ModNest? Nothing in the game folder is deleted.</p>`, 'Remove'))) return;
+      await invoke('remove_custom_game', { gameId: g.id });
+      ui.games = ui.games.filter((x) => x.id !== g.id);
+      showLibrary();
+    }
+  } catch (e) { fail(e); }
+}
+
+// ---------- My stuff ----------
+async function showMyStuff() {
+  ui.view = 'mine';
+  ui.state = null;
+  renderRail();
+  $('#main').innerHTML = '<div class="center"><div class="spinner"></div></div>';
+  let data, mgr;
+  try { [data, mgr] = await Promise.all([invoke('my_stuff'), invoke('manager_profiles').catch(() => [])]); } catch (e) { fail(e); return; }
+  if (ui.view !== 'mine') return;
+  const profileBlock = data.profiles.map((g) => `
+    <div class="mine-game">
+      <button class="mine-head" data-game="${esc(g.gameId)}">
+        <img src="${esc(g.capsule || '')}" alt="" /><span>${esc(g.gameName)}</span><span class="muted small">${plural(g.profiles.length, 'profile')}</span>
+      </button>
+      <div class="profile-grid" style="padding:8px 0 4px">${g.profiles.map((p) => `
+        <div class="pcard ${p.active ? 'active' : ''}">
+          <div class="top"><span class="nm">${esc(p.name)}</span>${p.active ? '<span class="pill blue">In use</span>' : ''}${p.modpack ? '<span class="pill line">Modpack</span>' : ''}</div>
+          <div class="list">${p.count ? esc(p.mods.join(' · ')) : 'Empty'}</div>
+          <div class="acts"><button class="btn sm" data-act="open-profile" data-g="${esc(g.gameId)}" data-name="${esc(p.name)}">Open</button></div>
+        </div>`).join('')}</div>
+    </div>`).join('');
+  const pubBlock = data.published.filter((g) => g.packages.length).map((g) => `
+    <div class="mine-game">
+      <button class="mine-head" data-game="${esc(g.gameId)}"><span>${esc(g.gameName)}</span><span class="muted small">${plural(g.packages.length, 'item')}</span></button>
+      <div class="rows" style="padding:6px 0">${g.packages.map((p) => `
+        <div class="row"><div class="row-head" style="cursor:default">${ico({ icon: p.icon, title: p.name })}
+          <div class="row-main"><div class="row-title"><span class="t">${esc(p.name)}</span><span class="a">v${esc(p.version)}</span></div><div class="row-desc">${esc(p.description || '')}</div></div>
+          <span class="pill ${p.kind === 'Modpack' ? 'blue' : 'line'}">${p.kind}</span></div></div>`).join('')}</div>
+    </div>`).join('');
+  $('#main').innerHTML = `
+    <div class="lib-head"><div><h1>My stuff</h1><p>Your profiles and modpacks in every game, and the mods you've published.</p></div></div>
+    <div class="scroll" style="padding-bottom:30px">
+      <div class="group-title">Your profiles</div>
+      <div style="padding:0 32px">${profileBlock || '<div class="empty">No profiles yet. Open a game and its mods are saved as a “Default” profile.</div>'}</div>
+      ${mgr.length ? `<div class="group-title">In Thunderstore Mod Manager on this PC</div><div style="padding:0 32px">${mgr.map((p) => `
+        <div class="row" style="margin-bottom:4px"><div class="row-head" style="cursor:default"><div class="row-main"><div class="row-title"><span class="t">${esc(p.name)}</span><span class="a">${esc(p.gameName)}</span></div><div class="row-desc">${esc(p.mods.slice(0, 10).join(' · '))}</div></div>
+        <span class="muted small">${plural(p.count, 'mod')}</span><button class="btn sm" data-act="import-mgr-any" data-g="${esc(p.gameId)}" data-name="${esc(p.name)}">Import</button></div></div>`).join('')}</div>` : ''}
+      <div class="group-title">Published by you <span class="pill line">ModNest catalog</span> <a href="#" data-act="link" data-url="${esc(data.repo)}" style="color:var(--accent-hi);font-weight:400">GitHub ↗</a></div>
+      <div style="padding:0 32px">${pubBlock || '<div class="empty">Nothing published yet.</div>'}</div>
+    </div>`;
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('#modal a.ext');
+  if (a) { e.preventDefault(); invoke('open_url', { url: a.dataset.url }).catch(fail); }
+});
 document.addEventListener('click', async (e) => {
   if (e.target.id !== 'clear-cache') return;
   e.preventDefault();
@@ -578,6 +736,8 @@ document.addEventListener('click', async (e) => {
   if (scope) { ui.libScope = scope.dataset.scope; return renderLibrary(); }
   const tabBtn = e.target.closest('[data-tab]');
   if (tabBtn && ui.view === 'game') { ui.menu = null; ui.tab = tabBtn.dataset.tab; return renderGame(); }
+  const src = e.target.closest('[data-source]');
+  if (src && ui.view === 'game') { ui.sourceFor[ui.gameId] = src.dataset.source; ui.browse = null; return renderTab(); }
   const lay = e.target.closest('[data-layout]');
   if (lay) { ui.layout = lay.dataset.layout; try { localStorage.setItem('modnest.layout', ui.layout); } catch { /* fine */ } return renderTab(); }
   if (!e.target.closest('[data-stop]') && !e.target.closest('[data-act]')) {
@@ -594,6 +754,21 @@ document.addEventListener('click', async (e) => {
   try {
     switch (el.dataset.act) {
       case 'library': showLibrary(); break;
+      case 'my-stuff': showMyStuff(); break;
+      case 'add-game': await addGameDialog(); break;
+      case 'game-settings': ui.menu = null; renderGame(); await gameSettingsDialog(); break;
+      case 'open-profile': {
+        await openGame(el.dataset.g, 'profiles');
+        const p = ui.state?.profiles.find((x) => x.name === name);
+        if (p && !p.active && (await confirmBox('Switch profile', `<p>Switch ${esc(ui.state.game.name)} to “${esc(name)}” now?</p>`, 'Switch'))) setState(await switchProfile(name));
+        break;
+      }
+      case 'import-mgr-any': {
+        const r = await invoke('import_manager_profile', { gameId: el.dataset.g, name });
+        toast('imp', `Imported “${r.name}”`, { text: 'Open the game to switch to it.', kind: 'ok', ttl: 4000 });
+        showMyStuff();
+        break;
+      }
       case 'settings': await settingsDialog(); break;
       case 'profile-menu': ui.menu = ui.menu === 'profile' ? null : 'profile'; renderGame(); break;
       case 'play-menu': ui.menu = ui.menu === 'play' ? null : 'play'; renderGame(); break;

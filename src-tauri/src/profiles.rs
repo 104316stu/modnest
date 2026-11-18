@@ -144,7 +144,7 @@ fn squash(s: &str) -> String {
 }
 
 /// Profiles saved by Thunderstore Mod Manager / r2modman on this PC: (community id, profile name, mods).
-pub fn local_manager_profiles() -> Vec<(String, String, Vec<ProfileMod>)> {
+pub fn local_manager_profiles(communities: &[crate::thunderstore::CommunityInfo]) -> Vec<(String, String, Vec<ProfileMod>)> {
     let mut roots: Vec<PathBuf> = Vec::new();
     if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
         roots.push(appdata.join("Thunderstore Mod Manager").join("DataFolder"));
@@ -155,7 +155,7 @@ pub fn local_manager_profiles() -> Vec<(String, String, Vec<ProfileMod>)> {
         let Ok(games) = std::fs::read_dir(&root) else { continue };
         for g in games.flatten() {
             let folder = g.file_name().to_string_lossy().to_string();
-            let Some(c) = crate::thunderstore::COMMUNITIES.iter().find(|c| squash(c.id) == squash(&folder) || squash(c.name) == squash(&folder)) else { continue };
+            let Some(c) = communities.iter().find(|c| squash(&c.id) == squash(&folder) || squash(&c.name) == squash(&folder)) else { continue };
             let Ok(profiles) = std::fs::read_dir(g.path().join("profiles")) else { continue };
             for p in profiles.flatten() {
                 let Ok(text) = std::fs::read_to_string(p.path().join("mods.yml")) else { continue };

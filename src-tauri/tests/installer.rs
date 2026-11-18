@@ -132,3 +132,64 @@ fn launch_args_turn_mods_on_or_off() {
     assert_eq!(launch_args(10, true, true), vec!["-applaunch", "10"]);
     assert_eq!(launch_args(10, true, false), vec!["-applaunch", "10", "--no-mods"]);
 }
+
+#[test]
+fn reads_curseforge_mods() {
+    use modnest_lib::curseforge::{listing_from, mod_from};
+    // Shape of a CurseForge API mod (trimmed).
+    let m = serde_json::json!({
+        "id": 1234, "name": "Better Thing", "summary": "Makes things better", "downloadCount": 5100.0, "thumbsUpCount": 7,
+        "authors": [{"name": "Someone"}], "logo": {"thumbnailUrl": "https://x/logo.png"}, "links": {"websiteUrl": "https://www.curseforge.com/x/better-thing"},
+        "allowModDistribution": true, "mainFileId": 2,
+        "latestFiles": [
+            {"id": 1, "fileName": "old.zip", "fileDate": "2024-01-01T00:00:00Z", "downloadUrl": "https://edge/old.zip", "dependencies": []},
+            {"id": 2, "fileName": "BetterThing.dll", "fileDate": "2025-03-09T10:00:00Z", "downloadUrl": "https://edge/BetterThing.dll",
+             "dependencies": [{"modId": 77, "relationType": 3}, {"modId": 88, "relationType": 2}]}
+        ]
+    });
+    let d = mod_from(&m).unwrap();
+    assert_eq!(d.key, "cf:1234");
+    assert_eq!(d.file_name, "BetterThing.dll");
+    assert_eq!(d.version, "2025-03-09");
+    assert_eq!(d.dependencies, vec!["cf:77"], "only required dependencies");
+    assert_eq!(d.download.as_deref(), Some("https://edge/BetterThing.dll"));
+    let l = listing_from(&m, false);
+    assert_eq!((l.downloads, l.author.as_str(), l.downloadable), (5100, "Someone", true));
+
+    // Author turned off third-party downloads: never fetched, page link instead.
+    let mut no = m.clone();
+    no["allowModDistribution"] = serde_json::json!(false);
+    assert!(mod_from(&no).unwrap().download.is_none());
+    assert!(!listing_from(&no, false).downloadable);
+}
+
+#[test]
+fn matches_game_names_across_stores() {
+    use modnest_lib::thunderstore::squash;
+    assert_eq!(squash("IRON NEST: Heavy Turret Simulator Demo"), squash("IRON NEST: Heavy Turret Simulator"));
+    assert_eq!(squash("R.E.P.O."), "repo");
+    assert_eq!(squash("Liar's Bar"), squash("Liars Bar"));
+    assert_eq!(squash("Gamble With Your Friends"), "gamblewithyourfriends");
+}
+
+#[test]
+fn plain_folder_and_single_file_installs() {
+    let p = plan(Layout::Folder, "Mods", &names(&["readme.md", "cool/thing.pak", "x.pak"]));
+    let d: Vec<_> = p.iter().map(|(_, d)| d.as_str()).collect();
+    assert_eq!(d, vec!["Mods/cool/thing.pak", "Mods/x.pak"]);
+    let p = plan(Layout::Folder, "", &names(&["x.pak"]));
+    assert_eq!(p[0].1, "x.pak");
+
+    let game = std::env::temp_dir().join(format!("modnest-single-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&game);
+    std::fs::create_dir_all(&game).unwrap();
+    assert!(!is_zip(b"MZ not a zip"));
+    let f = write_single(&game, Layout::Thunderstore, "cf-Thing", "Thing.dll", b"MZ").unwrap();
+    assert_eq!(f, vec!["BepInEx/plugins/cf-Thing/Thing.dll"]);
+    let f = write_single(&game, Layout::Melon, "x", "Thing.dll", b"MZ").unwrap();
+    assert_eq!(f, vec!["Mods/Thing.dll"]);
+    let f = write_single(&game, Layout::Folder, "Mods", "Thing.pak", b"x").unwrap();
+    assert!(game.join(&f[0]).exists());
+    assert!(write_single(&game, Layout::Folder, "Mods", "", b"x").is_err());
+    let _ = std::fs::remove_dir_all(&game);
+}
