@@ -56,19 +56,19 @@
                                    ],
                          "name":  "ChainedForge",
                          "author":  "ChainedForge",
-                         "description":  "Mod framework for Chained Beasts: content packs, Mods menu, Endless Runs, Card Limits and more. Needed by every Chained Beasts pack.",
-                         "version":  "0.1.0",
+                         "description":  "Mod framework for Chained Beasts: Mods menu, Endless Runs (Risk of Rain scaling, Continue after victory), card limits, Tab run stats, testing mode. Needed by every Chained Beasts pack.",
+                         "version":  "0.2.0",
                          "category":  "Framework",
                          "installType":  "plugin",
                          "installFolder":  "ChainedForge",
                          "dependencies":  [
                                               "bepinex-6-il2cpp"
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.1.0/chainedforge-0.1.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.2.0/chainedforge-0.2.0.zip",
                          "detect":  [
                                         "BepInEx/plugins/ChainedForge/ChainedForge.dll"
                                     ],
-                         "sha256":  "04b79ac5fdc103a360b5256d76b9d6f35938f6472bfbfa7a1f1520c7e9dce356"
+                         "sha256":  "2a68e2e18ffc56a21af7f59657b0079c2b59087191420a91222b4bd595b745ff"
                      },
                      {
                          "id":  "iron-nest-multiplayer",
@@ -90,6 +90,90 @@
                                         "BepInEx/plugins/IronNestMP/IronNestMP.dll"
                                     ],
                          "sha256":  "6fa8ee5dc64e2704f0342e7f1c91b27d78cf6637f02195944956056a18db92b7"
+                     },
+                     {
+                         "id":  "cf-arena-deck",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Arena Deck",
+                         "author":  "ChainedForge",
+                         "description":  "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, gambles, jackpots, curses and the cards that cleanse them.",
+                         "version":  "0.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "ArenaDeck",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/ArenaDeck/pack.json"
+                                    ],
+                         "sha256":  ""
+                     },
+                     {
+                         "id":  "cf-rounds-and-rain",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Rounds \u0026 Rain",
+                         "author":  "ChainedForge",
+                         "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather, Blood Vial, Fungal Bloom, Reaper\u0027s Edge, Shattered Glass, a coin flip and nasty curses.",
+                         "version":  "0.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "RoundsAndRain",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/RoundsAndRain/pack.json"
+                                    ],
+                         "sha256":  ""
+                     },
+                     {
+                         "id":  "cf-starter-pack",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "ChainedForge Starter Pack",
+                         "author":  "ChainedForge",
+                         "description":  "Six new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury...) and the developers\u0027 cut skills brought back.",
+                         "version":  "0.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "StarterPack",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/StarterPack/pack.json"
+                                    ],
+                         "sha256":  ""
+                     },
+                     {
+                         "id":  "cf-hard-mode",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Colosseum Hard Mode",
+                         "author":  "ChainedForge",
+                         "description":  "Tougher arena: enemies +50% health and +30% damage, a stronger Senate boss, angry crowds throw pots and no starting coins.",
+                         "version":  "0.0.0",
+                         "category":  "Difficulty",
+                         "installType":  "cf-pack",
+                         "installFolder":  "HardMode",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/HardMode/pack.json"
+                                    ],
+                         "sha256":  ""
                      }
                  ]
 }
