@@ -665,6 +665,8 @@ struct GameState {
     steam_vanilla: bool,
     /// Whether this game's loader can be switched that way (BepInEx with a doorstop config).
     steam_switchable: bool,
+    /// Dependencies of installed mods that are missing ("ts:Namespace-Name" ...).
+    missing_deps: Vec<String>,
 }
 
 /// Rough version compare: true if `b` is newer than `a`.
@@ -732,7 +734,7 @@ fn state_of(st: &AppState, g: &Game) -> GameState {
         })
         .collect();
     profiles.sort_by(|a, b| b.active.cmp(&a.active).then(a.name.to_lowercase().cmp(&b.name.to_lowercase())));
-    GameState { game: view(st, g), mods, base_missing, profiles, steam_vanilla: steam_vanilla(st, g), steam_switchable }
+    GameState { game: view(st, g), mods, base_missing, profiles, steam_vanilla: steam_vanilla(st, g), steam_switchable, missing_deps: missing_deps(st, g) }
 }
 
 fn progress(app: &AppHandle, game: &str, key: &str, title: &str, stage: &str, fraction: f64) {
@@ -1054,11 +1056,41 @@ async fn apply_inner(app: &AppHandle, st: &AppState, g: &Game, name: &str) -> Cm
             set_enabled_inner(st, g, &root, &m.key, m.enabled)?;
         }
     }
+    // Anything an installed mod needs but that's missing (e.g. after an interrupted change) comes back too.
+    let missing = missing_deps(st, g);
+    if !missing.is_empty() {
+        if let Err(e) = install_many(app, st, g, missing, false, &HashSet::new()).await {
+            failed.push(format!("dependencies: {e}"));
+        }
+    }
     prune_orphans(st, g, &root)?;
     let mut s = st.store.lock().unwrap();
     s.game(&g.id).active_profile = Some(name.to_string());
     s.save();
     Ok(failed)
+}
+
+/// Dependencies of installed mods that aren't installed (e.g. left behind by an interrupted change).
+/// A dependency on a mod loader counts as met when the game has any loader.
+fn missing_deps(st: &AppState, g: &Game) -> Vec<String> {
+    let reg = st.registry.lock().unwrap().clone();
+    let s = st.store.lock().unwrap();
+    let Some(r) = s.data.games.get(&g.id) else { return vec![] };
+    let has_loader = r.installed.values().any(|m| m.layout == "root");
+    let is_loader = |k: &str| match k.strip_prefix("ts:") {
+        Some(full) => thunderstore::is_loader(full),
+        None => k.strip_prefix("own:").and_then(|id| reg.package(id)).map(|p| p.install_type == "root").unwrap_or(false),
+    };
+    let mut out: Vec<String> = r
+        .installed
+        .values()
+        .flat_map(|m| m.dependencies.iter())
+        .filter(|d| !r.installed.contains_key(*d) && !(has_loader && is_loader(d)))
+        .cloned()
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 /// Removes dependencies nothing needs any more (e.g. left behind when a mod failed to install).
@@ -1721,6 +1753,19 @@ async fn install_modpack(app: AppHandle, game_id: String, key: String, title: St
     Ok(Applied { state: state_of(&st, &g), failed, changed: true })
 }
 
+/// Installs dependencies that installed mods need but are missing.
+#[tauri::command]
+async fn repair_dependencies(app: AppHandle, game_id: String, st: State<'_, AppState>) -> CmdResult<GameState> {
+    let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
+    let _guard = st.busy.lock().await;
+    let missing = missing_deps(&st, &g);
+    if !missing.is_empty() {
+        install_many(&app, &st, &g, missing, false, &HashSet::new()).await?;
+    }
+    Ok(state_of(&st, &g))
+}
+
 // ---------- commands: CurseForge key, games added by hand, My stuff ----------
 
 /// Saves the CurseForge API key after checking it works, then loads CurseForge's games.
@@ -1972,6 +2017,7 @@ pub fn run() {
             set_steam_mode,
             close_game,
             game_running,
+            repair_dependencies,
             clear_cache,
             save_profile,
             new_profile,

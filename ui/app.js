@@ -74,7 +74,7 @@ const fail = (e) => {
 };
 
 // Actions that change files in the game folder: ask to close the game first if it's running.
-const CHANGES_FILES = new Set(['install', 'install-pack', 'remove', 'update', 'update-all', 'switch-profile', 'new-profile', 'import-mgr', 'import-mgr-any', 'import-code', 'import-pasted', 'base', 'file', 'open-profile']);
+const CHANGES_FILES = new Set(['repair-deps', 'install', 'install-pack', 'remove', 'update', 'update-all', 'switch-profile', 'new-profile', 'import-mgr', 'import-mgr-any', 'import-code', 'import-pasted', 'base', 'file', 'open-profile']);
 async function readyToChange(gameId) {
   let running = null;
   try { running = await invoke('game_running', { gameId }); } catch { return true; }
@@ -329,6 +329,11 @@ function notes() {
   const offers = (ui.mgrAll || []).filter((p) => p.gameId === g.id && p.count && !ui.state.profiles.some((x) => x.name === p.name && x.count));
   if (g.installed && offers.length && (!active || !active.count)) {
     return offers.slice(0, 3).map((p) => `<div class="note blue"><span>Thunderstore Mod Manager has your profile <b>“${esc(p.name)}”</b> (${plural(p.count, 'mod')}) for this game.</span><button class="btn sm primary" data-act="import-mgr" data-name="${esc(p.name)}">Use it</button></div>`).join('');
+  }
+  const md = ui.state.missingDeps || [];
+  if (g.installed && md.length) {
+    const names = md.map((k) => k.replace(/^\w+:/, '').replace(/^[^-]+-/, '').replace(/_/g, ' '));
+    return `<div class="note amber"><span>${plural(md.length, 'mod')} that your mods need ${md.length === 1 ? 'is' : 'are'} missing: ${esc(names.slice(0, 5).join(', '))}${md.length > 5 ? ` +${md.length - 5} more` : ''}. Some mods won't load until ${md.length === 1 ? "it's" : "they're"} back.</span><button class="btn sm primary" data-act="repair-deps">Repair</button></div>`;
   }
   if (!g.installed) return `<div class="note amber"><span>ModNest can't find ${esc(g.name)} in Steam. Installed somewhere else?</span><button class="btn sm" data-act="folder">Set game folder</button></div>`;
   if (baseMissing.length) return `<div class="note blue"><span>${esc(g.loader)} is set up automatically with your first mod.</span><button class="btn sm" data-act="base">Set it up now</button></div>`;
@@ -827,6 +832,15 @@ document.addEventListener('click', async (e) => {
       case 'link': await invoke('open_url', { url: el.dataset.url }); break;
       case 'folder': { closeMenu(); const st = await invoke('set_game_folder', { gameId }); if (st) setState(st); break; }
       case 'file': { closeMenu(); const st = await invoke('install_file', { gameId }); if (st) { setState(st); toast('file', 'Mod installed from file', { kind: 'ok', ttl: 3000 }); } break; }
+      case 'repair-deps': {
+        el.disabled = true;
+        ui.batch = { name: 'missing mods', done: new Set() };
+        let st;
+        try { st = await invoke('repair_dependencies', { gameId }); } finally { dismiss('batch'); ui.batch = null; }
+        setState(st);
+        toast('rep', st.missingDeps.length ? 'Some mods are still missing' : 'Repaired: every mod has what it needs', { kind: st.missingDeps.length ? 'error' : 'ok', ttl: 4000 });
+        break;
+      }
       case 'base': el.disabled = true; setState(await invoke('ensure_base', { gameId })); break;
       case 'check': el.disabled = true; setState(await invoke('check_updates', { gameId })); toast('chk', 'Checked for updates', { ttl: 2000 }); break;
       case 'update-all': el.disabled = true; setState(await invoke('update_mods', { gameId, keys: ui.state.mods.filter((m) => m.updateAvailable).map((m) => m.key) })); break;
