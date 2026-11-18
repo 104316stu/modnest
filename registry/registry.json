@@ -141,18 +141,18 @@
                          "name":  "ChainedForge Starter Pack",
                          "author":  "ChainedForge",
                          "description":  "Six new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury...) and the developers\u0027 cut skills brought back.",
-                         "version":  "0.0.0",
+                         "version":  "1.0.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
                          "installFolder":  "StarterPack",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-starter-pack-1.0.0/cf-starter-pack-1.0.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/StarterPack/pack.json"
                                     ],
-                         "sha256":  ""
+                         "sha256":  "899f8871f5dc4fb3e569969fcb471e74f747954ee1386c0bab91a2e48cb50ccf"
                      },
                      {
                          "id":  "cf-hard-mode",
