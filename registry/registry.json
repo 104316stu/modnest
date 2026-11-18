@@ -1,66 +1,95 @@
 {
-  "schema": 1,
-  "updated": "2026-11-18",
-  "games": [
-    {
-      "id": "chained-beasts",
-      "name": "Chained Beasts",
-      "steamAppIds": [3569420],
-      "exe": "ChainedBeasts.exe",
-      "loader": "BepInEx 6 IL2CPP",
-      "accent": "#c2410c",
-      "basePackages": ["bepinex-6-il2cpp", "chainedforge"]
-    },
-    {
-      "id": "iron-nest",
-      "name": "IRON NEST: Heavy Turret Simulator",
-      "steamAppIds": [4300500],
-      "loader": "BepInEx 6 IL2CPP",
-      "accent": "#0e7490",
-      "basePackages": ["bepinex-6-il2cpp"]
-    }
-  ],
-  "packages": [
-    {
-      "id": "bepinex-6-il2cpp",
-      "games": ["chained-beasts", "iron-nest"],
-      "name": "BepInEx 6 (IL2CPP)",
-      "author": "BepInEx",
-      "description": "The mod loader every mod here needs. Installed automatically.",
-      "version": "6.0.0-be.793",
-      "category": "Loader",
-      "installType": "root",
-      "download": "https://builds.bepinex.dev/projects/bepinex_be/793/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.793%2Bdbc82f0.zip",
-      "detect": ["winhttp.dll", "BepInEx/core/BepInEx.Unity.IL2CPP.dll"],
-      "website": "https://github.com/BepInEx/BepInEx"
-    },
-    {
-      "id": "chainedforge",
-      "games": ["chained-beasts"],
-      "name": "ChainedForge",
-      "author": "ChainedForge",
-      "description": "Mod framework for Chained Beasts: content packs, Mods menu, Endless Runs, Card Limits and more. Needed by every Chained Beasts pack.",
-      "version": "1.0.0",
-      "category": "Framework",
-      "installType": "plugin",
-      "installFolder": "ChainedForge",
-      "dependencies": ["bepinex-6-il2cpp"],
-      "download": "https://github.com/104316stu/modnest/releases/download/chainedforge-1.0.0/chainedforge-1.0.0.zip",
-      "detect": ["BepInEx/plugins/ChainedForge/ChainedForge.dll"]
-    },
-    {
-      "id": "iron-nest-multiplayer",
-      "games": ["iron-nest"],
-      "name": "Iron Nest Multiplayer",
-      "author": "IronNestMP",
-      "description": "Online co-op over Steam. Press F8 in game to host or join a friend. Everyone needs the same version.",
-      "version": "1.0.0",
-      "category": "Multiplayer",
-      "installType": "plugin",
-      "installFolder": "IronNestMP",
-      "dependencies": ["bepinex-6-il2cpp"],
-      "download": "https://github.com/104316stu/modnest/releases/download/iron-nest-multiplayer-1.0.0/iron-nest-multiplayer-1.0.0.zip",
-      "detect": ["BepInEx/plugins/IronNestMP/IronNestMP.dll"]
-    }
-  ]
+    "schema":  1,
+    "updated":  "2026-11-18",
+    "games":  [
+                  {
+                      "id":  "chained-beasts",
+                      "name":  "Chained Beasts",
+                      "steamAppIds":  [
+                                          3569420
+                                      ],
+                      "exe":  "ChainedBeasts.exe",
+                      "loader":  "BepInEx 6 IL2CPP",
+                      "accent":  "#c2410c",
+                      "basePackages":  [
+                                           "bepinex-6-il2cpp",
+                                           "chainedforge"
+                                       ]
+                  },
+                  {
+                      "id":  "iron-nest",
+                      "name":  "IRON NEST: Heavy Turret Simulator",
+                      "steamAppIds":  [
+                                          4300500
+                                      ],
+                      "loader":  "BepInEx 6 IL2CPP",
+                      "accent":  "#0e7490",
+                      "basePackages":  [
+                                           "bepinex-6-il2cpp"
+                                       ]
+                  }
+              ],
+    "packages":  [
+                     {
+                         "id":  "bepinex-6-il2cpp",
+                         "games":  [
+                                       "chained-beasts",
+                                       "iron-nest"
+                                   ],
+                         "name":  "BepInEx 6 (IL2CPP)",
+                         "author":  "BepInEx",
+                         "description":  "The mod loader every mod here needs. Installed automatically.",
+                         "version":  "6.0.0-be.793",
+                         "category":  "Loader",
+                         "installType":  "root",
+                         "download":  "https://builds.bepinex.dev/projects/bepinex_be/793/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.793%2Bdbc82f0.zip",
+                         "detect":  [
+                                        "winhttp.dll",
+                                        "BepInEx/core/BepInEx.Unity.IL2CPP.dll"
+                                    ],
+                         "website":  "https://github.com/BepInEx/BepInEx"
+                     },
+                     {
+                         "id":  "chainedforge",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "ChainedForge",
+                         "author":  "ChainedForge",
+                         "description":  "Mod framework for Chained Beasts: content packs, Mods menu, Endless Runs, Card Limits and more. Needed by every Chained Beasts pack.",
+                         "version":  "0.1.0",
+                         "category":  "Framework",
+                         "installType":  "plugin",
+                         "installFolder":  "ChainedForge",
+                         "dependencies":  [
+                                              "bepinex-6-il2cpp"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.1.0/chainedforge-0.1.0.zip",
+                         "detect":  [
+                                        "BepInEx/plugins/ChainedForge/ChainedForge.dll"
+                                    ],
+                         "sha256":  "04b79ac5fdc103a360b5256d76b9d6f35938f6472bfbfa7a1f1520c7e9dce356"
+                     },
+                     {
+                         "id":  "iron-nest-multiplayer",
+                         "games":  [
+                                       "iron-nest"
+                                   ],
+                         "name":  "Iron Nest Multiplayer",
+                         "author":  "IronNestMP",
+                         "description":  "Online co-op over Steam. Press F8 in game to host or join a friend. Everyone needs the same version.",
+                         "version":  "0.2.1",
+                         "category":  "Multiplayer",
+                         "installType":  "plugin",
+                         "installFolder":  "IronNestMP",
+                         "dependencies":  [
+                                              "bepinex-6-il2cpp"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/iron-nest-multiplayer-0.2.1/iron-nest-multiplayer-0.2.1.zip",
+                         "detect":  [
+                                        "BepInEx/plugins/IronNestMP/IronNestMP.dll"
+                                    ],
+                         "sha256":  "6fa8ee5dc64e2704f0342e7f1c91b27d78cf6637f02195944956056a18db92b7"
+                     }
+                 ]
 }
