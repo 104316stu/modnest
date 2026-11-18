@@ -50,8 +50,17 @@ Everyone's ModNest picks it up the next time they open the game. For a brand-new
 2. `git tag v0.2.0 && git push --tags`
 
 The GitHub Action builds the installer, signs it and publishes the release. Installed copies show an "Update and restart" bar.
-It needs one repo secret, `TAURI_SIGNING_PRIVATE_KEY`: the contents of `%USERPROFILE%\.tauri\modnest.key`.
-**Back that key file up.** Without it you can't ship updates to people who already installed ModNest.
+It needs one repo secret, `TAURI_SIGNING_PRIVATE_KEY`: the contents of `%USERPROFILE%\.tauri\modnest.key`
+(GitHub → repo Settings → Secrets and variables → Actions → New repository secret).
+
+**Or release from your own PC** (the key never leaves it; this is how v0.1.0 was published):
+
+1. Bump the version, then build with the key in the environment:
+   `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $env:USERPROFILE\.tauri\modnest.key -Raw; npm run build`
+2. Make `latest.json`: `{"version":"X.Y.Z","pub_date":"<UTC time>","platforms":{"windows-x86_64":{"signature":"<contents of the .sig file>","url":"https://github.com/104316stu/modnest/releases/download/vX.Y.Z/ModNest_X.Y.Z_x64-setup.exe"}}}`
+3. `gh release create vX.Y.Z --latest <setup.exe> <setup.exe.sig> latest.json`
+
+**Back up the key file.** Without it you can't ship updates to people who already installed ModNest.
 
 ## Building it yourself
 

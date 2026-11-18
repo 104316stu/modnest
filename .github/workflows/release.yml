@@ -14,6 +14,15 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      - name: Check the update-signing key is set up
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        shell: pwsh
+        run: |
+          if (-not $env:KEY) {
+            Write-Error "Add the repo secret TAURI_SIGNING_PRIVATE_KEY (contents of %USERPROFILE%\.tauri\modnest.key) before tagging a release. Or build and upload the release locally (see README)."
+            exit 1
+          }
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
