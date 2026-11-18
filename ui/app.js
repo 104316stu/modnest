@@ -66,9 +66,17 @@ function toast(id, title, { text = '', kind = '', fraction = null, ttl = 0 } = {
   el.innerHTML = `<div class="toast-title">${esc(title)}</div>${text ? `<div class="muted small">${esc(text)}</div>` : ''}${bar}`;
   if (ttl) setTimeout(() => { el.remove(); toasts.delete(id); }, ttl);
 }
+function dismiss(id) { const el = toasts.get(id); if (el) { el.remove(); toasts.delete(id); } }
 const fail = (e) => toast('err' + Date.now(), 'Something went wrong', { text: String(e), kind: 'error', ttl: 10000 });
 
 listen('progress', (p) => {
+  // During a profile switch or modpack install, one combined message instead of a popup per mod.
+  if (ui.batch) {
+    if (p.stage === 'done') ui.batch.done.add(p.title);
+    const n = ui.batch.done.size;
+    toast('batch', `Setting up “${ui.batch.name}”…`, { text: n ? `${plural(n, 'mod')} installed` : `Installing ${p.title}`, fraction: -1 });
+    return;
+  }
   const id = 'p:' + p.key;
   if (p.stage === 'done') toast(id, p.title, { text: 'Installed', kind: 'ok', ttl: 2200 });
   else if (p.stage === 'resolve') toast(id, 'Getting mod info…', { fraction: -1 });
@@ -195,6 +203,7 @@ async function openGame(id, tab = 'installed') {
     ui.state = st;
     renderGame();
     autoMaintain(id);
+    if (!ui.mgrAll) invoke('manager_profiles').then((l) => { ui.mgrAll = l; if (ui.gameId === id && ui.view === 'game') renderTab(); }).catch(() => { ui.mgrAll = []; });
   } catch (e) { fail(e); showLibrary(); }
 }
 
@@ -209,7 +218,8 @@ async function autoMaintain(id) {
     setState(st);
     const outdated = st.mods.filter((m) => m.updateAvailable).map((m) => m.key);
     if (ui.settings.autoUpdateMods && outdated.length) {
-      setState(await invoke('update_mods', { gameId: id, keys: outdated }));
+      ui.batch = { name: 'updates', done: new Set() };
+      try { setState(await invoke('update_mods', { gameId: id, keys: outdated })); } finally { dismiss('batch'); ui.batch = null; }
       toast('upd' + id, `Updated ${plural(outdated.length, 'mod')}`, { kind: 'ok', ttl: 4000 });
     }
   } catch (e) { fail(e); }
@@ -296,6 +306,12 @@ function closeMenu() {
 function notes() {
   const { game: g, baseMissing, mods } = ui.state;
   const updates = mods.filter((m) => m.updateAvailable);
+  // Profiles from Thunderstore Mod Manager for this game, while the current ModNest profile is still empty.
+  const active = ui.state.profiles.find((p) => p.active);
+  const offers = (ui.mgrAll || []).filter((p) => p.gameId === g.id && p.count && !ui.state.profiles.some((x) => x.name === p.name && x.count));
+  if (g.installed && offers.length && (!active || !active.count)) {
+    return offers.slice(0, 3).map((p) => `<div class="note blue"><span>Thunderstore Mod Manager has your profile <b>“${esc(p.name)}”</b> (${plural(p.count, 'mod')}) for this game.</span><button class="btn sm primary" data-act="import-mgr" data-name="${esc(p.name)}">Use it</button></div>`).join('');
+  }
   if (!g.installed) return `<div class="note amber"><span>ModNest can't find ${esc(g.name)} in Steam. Installed somewhere else?</span><button class="btn sm" data-act="folder">Set game folder</button></div>`;
   if (baseMissing.length) return `<div class="note blue"><span>${esc(g.loader)} is set up automatically with your first mod.</span><button class="btn sm" data-act="base">Set it up now</button></div>`;
   if (updates.length) return `<div class="note amber"><span>${plural(updates.length, 'mod')} can be updated.</span><button class="btn sm primary" data-act="update-all">Update all</button></div>`;
@@ -555,10 +571,15 @@ async function shareDialog(name) {
 }
 
 async function switchProfile(name) {
-  toast('sw', `Switching to “${name}”…`, { fraction: -1 });
-  const r = await invoke('apply_profile', { gameId: ui.gameId, name });
-  toast('sw', `Now using “${name}”`, { kind: 'ok', ttl: 2500 });
-  if (r.failed.length) toast('swf', `${plural(r.failed.length, 'mod')} couldn't be installed`, { text: r.failed.join('\n'), kind: 'error', ttl: 12000 });
+  // Only say "Switching…" if it takes a moment (i.e. mods are actually being changed).
+  ui.batch = { name, done: new Set() };
+  let r;
+  try { r = await invoke('apply_profile', { gameId: ui.gameId, name }); } finally { dismiss('batch'); }
+  const installed = ui.batch.done.size;
+  ui.batch = null;
+  // Nothing changed (everything was already in place): no message at all.
+  if (r.changed) toast('sw', `Now using “${name}”`, { text: installed ? `${plural(installed, 'mod')} installed` : '', kind: 'ok', ttl: 2500 });
+  if (r.failed.length) toast('swf', `${plural(r.failed.length, 'mod')} couldn't be installed`, { text: r.failed.join(' · '), kind: 'error', ttl: 12000 });
   ui.browse = null;
   return r.state;
 }
@@ -765,8 +786,9 @@ document.addEventListener('click', async (e) => {
       }
       case 'import-mgr-any': {
         const r = await invoke('import_manager_profile', { gameId: el.dataset.g, name });
-        toast('imp', `Imported “${r.name}”`, { text: 'Open the game to switch to it.', kind: 'ok', ttl: 4000 });
-        showMyStuff();
+        await openGame(r.gameId);
+        setState(await switchProfile(r.name));
+        toast('imp', `Imported “${r.name}” from Thunderstore Mod Manager`, { kind: 'ok', ttl: 3000 });
         break;
       }
       case 'settings': await settingsDialog(); break;
@@ -805,7 +827,9 @@ document.addEventListener('click', async (e) => {
         try {
           let st;
           if (pack) {
-            const r = await invoke('install_modpack', { gameId, key, title: el.dataset.title });
+            ui.batch = { name: el.dataset.title, done: new Set() };
+            let r;
+            try { r = await invoke('install_modpack', { gameId, key, title: el.dataset.title }); } finally { dismiss('batch'); ui.batch = null; }
             st = r.state;
             if (r.failed.length) toast('mpf', `${plural(r.failed.length, 'mod')} couldn't be installed`, { text: r.failed.join('\n'), kind: 'error', ttl: 12000 });
             toast('mp', `Modpack ready in profile “${st.game.activeProfile}”`, { kind: 'ok', ttl: 4000 });

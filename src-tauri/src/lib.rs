@@ -925,14 +925,34 @@ fn snapshot(st: &AppState, g: &Game) -> Vec<ProfileMod> {
         .unwrap_or_default()
 }
 
-/// Keeps the active profile in step with what's installed.
+/// Records what you installed, updated or switched on/off in the active profile. It only adds and
+/// updates: a profile mod that isn't installed right now (e.g. its install failed) stays in the profile,
+/// so selecting the profile again can still bring it back. Uninstalling removes it (profile_forget).
 fn sync_active(st: &AppState, g: &Game) {
     let mods = snapshot(st, g);
     let mut s = st.store.lock().unwrap();
     let rec = s.game(&g.id);
     if let Some(name) = rec.active_profile.clone() {
         if let Some(p) = rec.profiles.get_mut(&name) {
-            p.mods = mods;
+            for m in mods {
+                match p.mods.iter_mut().find(|x| x.key == m.key) {
+                    Some(x) => *x = m,
+                    None => p.mods.push(m),
+                }
+            }
+            p.updated = now();
+        }
+    }
+    s.save();
+}
+
+/// Takes a mod out of the active profile (you uninstalled it).
+fn profile_forget(st: &AppState, g: &Game, key: &str) {
+    let mut s = st.store.lock().unwrap();
+    let rec = s.game(&g.id);
+    if let Some(name) = rec.active_profile.clone() {
+        if let Some(p) = rec.profiles.get_mut(&name) {
+            p.mods.retain(|m| m.key != key);
             p.updated = now();
         }
     }
@@ -947,6 +967,24 @@ fn unique_name(st: &AppState, g: &Game, want: &str) -> String {
         return base;
     }
     (2..).map(|i| format!("{base} ({i})")).find(|n| !taken(n)).unwrap()
+}
+
+/// Name for an imported profile: an empty profile with the same name (like the "Default" ModNest makes
+/// on first open) is replaced instead of ending up with "Default (2)". If that empty profile is the one
+/// in use, it's released first so switching to the import doesn't save the empty setup over it.
+fn import_name(st: &AppState, g: &Game, want: &str) -> String {
+    let want = want.trim();
+    let mut s = st.store.lock().unwrap();
+    let rec = s.game(&g.id);
+    if rec.profiles.get(want).map(|p| p.mods.is_empty()).unwrap_or(false) {
+        if rec.active_profile.as_deref() == Some(want) {
+            rec.active_profile = None;
+        }
+        s.save();
+        return want.to_string();
+    }
+    drop(s);
+    unique_name(st, g, want)
 }
 
 fn put_profile(st: &AppState, g: &Game, p: Profile) {
@@ -1016,10 +1054,41 @@ async fn apply_inner(app: &AppHandle, st: &AppState, g: &Game, name: &str) -> Cm
             set_enabled_inner(st, g, &root, &m.key, m.enabled)?;
         }
     }
+    prune_orphans(st, g, &root)?;
     let mut s = st.store.lock().unwrap();
     s.game(&g.id).active_profile = Some(name.to_string());
     s.save();
     Ok(failed)
+}
+
+/// Removes dependencies nothing needs any more (e.g. left behind when a mod failed to install).
+fn prune_orphans(st: &AppState, g: &Game, root: &Path) -> CmdResult<()> {
+    let base: HashSet<String> = cached_base_keys(st, g).into_iter().collect();
+    // Everything reachable from the mods you chose (and the loader) stays; other dependencies go.
+    let orphans: Vec<String> = {
+        let s = st.store.lock().unwrap();
+        let Some(r) = s.data.games.get(&g.id) else { return Ok(()) };
+        let mut keep: HashSet<String> = r.installed.iter().filter(|(k, m)| !m.auto || base.contains(*k)).map(|(k, _)| k.clone()).collect();
+        let mut queue: Vec<String> = keep.iter().cloned().collect();
+        while let Some(k) = queue.pop() {
+            for d in r.installed.get(&k).map(|m| m.dependencies.clone()).unwrap_or_default() {
+                if r.installed.contains_key(&d) && keep.insert(d.clone()) {
+                    queue.push(d);
+                }
+            }
+        }
+        r.installed.keys().filter(|k| !keep.contains(*k)).cloned().collect()
+    };
+    for k in orphans {
+        let rec = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.installed.get(&k).cloned());
+        if let Some(m) = rec {
+            installer::remove_files(root, &m.files).map_err(err)?;
+            let mut s = st.store.lock().unwrap();
+            s.game(&g.id).installed.remove(&k);
+            s.save();
+        }
+    }
+    Ok(())
 }
 
 // ---------- commands: games & mods ----------
@@ -1184,6 +1253,7 @@ async fn uninstall(game_id: String, key: String, st: State<'_, AppState>) -> Cmd
     let root = require_path(&st, &g)?;
     let _guard = st.busy.lock().await;
     uninstall_inner(&st, &g, &root, &key)?;
+    profile_forget(&st, &g, &key);
     sync_active(&st, &g);
     Ok(state_of(&st, &g))
 }
@@ -1433,6 +1503,16 @@ async fn new_profile(app: AppHandle, game_id: String, name: String, st: State<'_
 struct Applied {
     state: GameState,
     failed: Vec<String>,
+    /// False when the game already had exactly this profile's mods (nothing installed, removed or switched).
+    changed: bool,
+}
+
+/// What's in the game folder right now: each mod with its version and on/off state.
+fn folder_fingerprint(st: &AppState, g: &Game) -> Vec<(String, String, bool)> {
+    let s = st.store.lock().unwrap();
+    let mut v: Vec<_> = s.data.games.get(&g.id).map(|r| r.installed.values().map(|m| (m.key.clone(), m.version.clone(), m.enabled)).collect()).unwrap_or_default();
+    v.sort();
+    v
 }
 
 #[tauri::command]
@@ -1440,8 +1520,11 @@ async fn apply_profile(app: AppHandle, game_id: String, name: String, st: State<
     let g = find_game(&st, &game_id)?;
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
+    let before = folder_fingerprint(&st, &g);
+    let was_active = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.active_profile.clone()) == Some(name.clone());
     let failed = apply_inner(&app, &st, &g, &name).await?;
-    Ok(Applied { state: state_of(&st, &g), failed })
+    let changed = !was_active || folder_fingerprint(&st, &g) != before;
+    Ok(Applied { state: state_of(&st, &g), failed, changed })
 }
 
 #[tauri::command]
@@ -1512,7 +1595,7 @@ async fn import_code(code: String, game_id: String, st: State<'_, AppState>) -> 
         (game_id, name, mods)
     };
     let g = find_game(&st, &gid).map_err(|_| "That code is for a game ModNest doesn't know.".to_string())?;
-    let name = unique_name(&st, &g, &name);
+    let name = import_name(&st, &g, &name);
     put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
     Ok(json!({ "gameId": g.id, "name": name }))
 }
@@ -1538,7 +1621,7 @@ fn import_manager_profile(game_id: String, name: String, st: State<'_, AppState>
         .into_iter()
         .find(|(c, n, _)| *c == community && *n == name)
         .ok_or("That profile isn't there any more.")?;
-    let name = unique_name(&st, &g, &name);
+    let name = import_name(&st, &g, &name);
     put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
     Ok(json!({ "gameId": g.id, "name": name }))
 }
@@ -1564,7 +1647,7 @@ async fn install_modpack(app: AppHandle, game_id: String, key: String, title: St
     put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: Some(key), updated: now() });
     let failed = apply_inner(&app, &st, &g, &name).await?;
     sync_active(&st, &g);
-    Ok(Applied { state: state_of(&st, &g), failed })
+    Ok(Applied { state: state_of(&st, &g), failed, changed: true })
 }
 
 // ---------- commands: CurseForge key, games added by hand, My stuff ----------
@@ -1782,7 +1865,10 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .register_uri_scheme_protocol("art", |_ctx, req| art_protocol(req.uri().path()))
         .setup(|app| {
-            let data_dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("ModNest"));
+            // MODNEST_DATA_DIR lets tests run with their own settings and saved state.
+            let data_dir = std::env::var_os("MODNEST_DATA_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("ModNest")));
             app.manage(AppState {
                 store: Mutex::new(Store::open(data_dir.clone())),
                 registry: Mutex::new(Registry::bundled()),
