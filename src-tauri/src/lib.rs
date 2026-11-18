@@ -1091,6 +1091,68 @@ fn prune_orphans(st: &AppState, g: &Game, root: &Path) -> CmdResult<()> {
     Ok(())
 }
 
+
+// ---------- is the game running? ----------
+
+/// Programs running from inside the game folder (the game itself, its crash handler...). Windows locks
+/// mod files while they run, so changing mods then would stop halfway.
+fn running_in(root: &Path) -> Vec<(sysinfo::Pid, String)> {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_exe(sysinfo::UpdateKind::Always));
+    let root = root.to_string_lossy().to_lowercase();
+    let root = root.trim_end_matches(['\\', '/']).to_string() + "\\";
+    sys.processes()
+        .iter()
+        .filter_map(|(pid, p)| {
+            let exe = p.exe()?.to_string_lossy().to_lowercase();
+            exe.starts_with(&root).then(|| (*pid, p.name().to_string_lossy().to_string()))
+        })
+        .collect()
+}
+
+/// Refuses to change mods while the game is open. The UI recognises the "GAME_RUNNING|" prefix
+/// and offers to close the game and try again.
+fn ensure_not_running(st: &AppState, g: &Game) -> CmdResult<()> {
+    let Some(root) = game_path(st, g) else { return Ok(()) };
+    if running_in(&root).is_empty() {
+        return Ok(());
+    }
+    Err(format!("GAME_RUNNING|{}|{} is running. Windows locks mod files while the game is open, so close it first.", g.name, g.name))
+}
+
+/// The name of the game's program if it's running right now (for the UI to ask before changing mods).
+#[tauri::command]
+fn game_running(game_id: String, st: State<'_, AppState>) -> CmdResult<Option<String>> {
+    let g = find_game(&st, &game_id)?;
+    Ok(game_path(&st, &g).and_then(|root| running_in(&root).into_iter().next().map(|(_, n)| n)))
+}
+
+/// Closes everything running from the game folder, then waits (up to 10 s) until it has exited.
+#[tauri::command]
+async fn close_game(game_id: String, st: State<'_, AppState>) -> CmdResult<usize> {
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
+    let g = find_game(&st, &game_id)?;
+    let root = require_path(&st, &g)?;
+    let procs = running_in(&root);
+    let mut sys = System::new();
+    sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    for (pid, _) in &procs {
+        if let Some(p) = sys.process(*pid) {
+            p.kill();
+        }
+    }
+    for _ in 0..40 {
+        if running_in(&root).is_empty() {
+            // Give Windows a moment to release the file locks.
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            return Ok(procs.len());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    Err(format!("{} didn't close. Close it yourself and try again.", g.name))
+}
+
 // ---------- commands: games & mods ----------
 
 #[tauri::command]
@@ -1221,6 +1283,7 @@ async fn section_is_modpacks(st: &AppState, cf_game: u32, class_id: Option<u32>)
 #[tauri::command]
 async fn install(app: AppHandle, game_id: String, key: String, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let mut keys = base_keys(&st, &g).await;
     let mut explicit: HashSet<String> = keys.iter().cloned().collect();
     explicit.insert(key.clone());
@@ -1234,6 +1297,7 @@ async fn install(app: AppHandle, game_id: String, key: String, st: State<'_, App
 #[tauri::command]
 async fn ensure_base(app: AppHandle, game_id: String, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let keys = base_keys(&st, &g).await;
     if let Some(root) = game_path(&st, &g) {
         reconcile(&st, &g, &root);
@@ -1247,6 +1311,7 @@ async fn ensure_base(app: AppHandle, game_id: String, st: State<'_, AppState>) -
 #[tauri::command]
 async fn uninstall(game_id: String, key: String, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     if cached_base_keys(&st, &g).contains(&key) {
         return Err("This is the base mod loader every other mod needs, so it can't be removed.".into());
     }
@@ -1261,6 +1326,7 @@ async fn uninstall(game_id: String, key: String, st: State<'_, AppState>) -> Cmd
 #[tauri::command]
 async fn set_enabled(game_id: String, key: String, enabled: bool, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     if !enabled && cached_base_keys(&st, &g).contains(&key) {
         return Err("The base mod loader is always on.".into());
     }
@@ -1303,6 +1369,7 @@ async fn check_updates(game_id: String, st: State<'_, AppState>) -> CmdResult<Ga
 #[tauri::command]
 async fn update_mods(app: AppHandle, game_id: String, keys: Vec<String>, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let _guard = st.busy.lock().await;
     // Updating keeps each mod's "you picked it / it's a dependency" status.
     let explicit: HashSet<String> = {
@@ -1317,6 +1384,7 @@ async fn update_mods(app: AppHandle, game_id: String, keys: Vec<String>, st: Sta
 #[tauri::command]
 async fn install_file(app: AppHandle, game_id: String, st: State<'_, AppState>) -> CmdResult<Option<GameState>> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let root = require_path(&st, &g)?;
     let Some(file) = app.dialog().file().set_title("Pick a mod zip").add_filter("Mod zip", &["zip"]).blocking_pick_file() else {
         return Ok(None);
@@ -1491,6 +1559,7 @@ async fn save_profile(game_id: String, name: String, st: State<'_, AppState>) ->
 #[tauri::command]
 async fn new_profile(app: AppHandle, game_id: String, name: String, st: State<'_, AppState>) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
     let name = unique_name(&st, &g, &name);
@@ -1518,6 +1587,7 @@ fn folder_fingerprint(st: &AppState, g: &Game) -> Vec<(String, String, bool)> {
 #[tauri::command]
 async fn apply_profile(app: AppHandle, game_id: String, name: String, st: State<'_, AppState>) -> CmdResult<Applied> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
     let before = folder_fingerprint(&st, &g);
@@ -1630,6 +1700,7 @@ fn import_manager_profile(game_id: String, name: String, st: State<'_, AppState>
 #[tauri::command]
 async fn install_modpack(app: AppHandle, game_id: String, key: String, title: String, st: State<'_, AppState>) -> CmdResult<Applied> {
     let g = find_game(&st, &game_id)?;
+    ensure_not_running(&st, &g)?;
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
     let name = unique_name(&st, &g, &title);
@@ -1899,6 +1970,8 @@ pub fn run() {
             open_url,
             save_settings,
             set_steam_mode,
+            close_game,
+            game_running,
             clear_cache,
             save_profile,
             new_profile,

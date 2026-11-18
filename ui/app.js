@@ -67,7 +67,25 @@ function toast(id, title, { text = '', kind = '', fraction = null, ttl = 0 } = {
   if (ttl) setTimeout(() => { el.remove(); toasts.delete(id); }, ttl);
 }
 function dismiss(id) { const el = toasts.get(id); if (el) { el.remove(); toasts.delete(id); } }
-const fail = (e) => toast('err' + Date.now(), 'Something went wrong', { text: String(e), kind: 'error', ttl: 10000 });
+const fail = (e) => {
+  const msg = String(e);
+  if (msg.startsWith('GAME_RUNNING|')) return toast('err' + Date.now(), 'Close the game first', { text: msg.split('|').slice(2).join('|'), kind: 'error', ttl: 8000 });
+  toast('err' + Date.now(), 'Something went wrong', { text: msg, kind: 'error', ttl: 10000 });
+};
+
+// Actions that change files in the game folder: ask to close the game first if it's running.
+const CHANGES_FILES = new Set(['install', 'install-pack', 'remove', 'update', 'update-all', 'switch-profile', 'new-profile', 'import-mgr', 'import-mgr-any', 'import-code', 'import-pasted', 'base', 'file', 'open-profile']);
+async function readyToChange(gameId) {
+  let running = null;
+  try { running = await invoke('game_running', { gameId }); } catch { return true; }
+  if (!running) return true;
+  const g = ui.games.find((x) => x.id === gameId) || {};
+  const ok = await confirmBox(`${g.name || 'The game'} is running`, `<p>Mods can't be changed while the game is open: Windows locks their files.</p><p class="muted small">Closing it now loses anything unsaved in the game (${esc(running)}).</p>`, 'Close game and continue');
+  if (!ok) return false;
+  toast('close', `Closing ${g.name || 'the game'}…`, { fraction: -1 });
+  try { await invoke('close_game', { gameId }); } finally { dismiss('close'); }
+  return true;
+}
 
 listen('progress', (p) => {
   // During a profile switch or modpack install, one combined message instead of a popup per mod.
@@ -222,7 +240,7 @@ async function autoMaintain(id) {
       try { setState(await invoke('update_mods', { gameId: id, keys: outdated })); } finally { dismiss('batch'); ui.batch = null; }
       toast('upd' + id, `Updated ${plural(outdated.length, 'mod')}`, { kind: 'ok', ttl: 4000 });
     }
-  } catch (e) { fail(e); }
+  } catch (e) { if (!String(e).startsWith('GAME_RUNNING|')) fail(e); }
 }
 
 function setState(st) {
@@ -773,6 +791,8 @@ document.addEventListener('click', async (e) => {
   const key = el.dataset.key;
   const name = el.dataset.name;
   try {
+    const target = el.dataset.g || gameId;
+    if (CHANGES_FILES.has(el.dataset.act) && target && !(await readyToChange(target))) { ui.menu = null; if (ui.view === 'game') renderGame(); return; }
     switch (el.dataset.act) {
       case 'library': showLibrary(); break;
       case 'my-stuff': showMyStuff(); break;
@@ -897,6 +917,7 @@ document.addEventListener('click', async (e) => {
 document.addEventListener('change', async (e) => {
   const key = e.target.dataset.enable;
   if (!key) return;
+  if (!(await readyToChange(ui.gameId))) { e.target.checked = !e.target.checked; return; }
   try { setState(await invoke('set_enabled', { gameId: ui.gameId, key, enabled: e.target.checked })); }
   catch (err) { fail(err); e.target.checked = !e.target.checked; }
 });
