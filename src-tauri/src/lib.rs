@@ -90,9 +90,21 @@ impl Game {
             None => !self.melon && (self.own.is_some() || self.ts.is_some()),
         }
     }
+    /// Ids a catalog package may use for this game: its own id, or "ts-<community>" for its Thunderstore game.
+    fn catalog_ids(&self) -> Vec<String> {
+        let mut v = vec![self.id.clone()];
+        if let Some(c) = &self.ts {
+            v.push(format!("ts-{}", c.id));
+        }
+        v
+    }
+    fn in_catalog(&self, p: &registry::OwnPackage) -> bool {
+        let ids = self.catalog_ids();
+        p.games.iter().any(|g| ids.contains(g))
+    }
     fn sources(&self, reg: &Registry) -> Vec<&'static str> {
         let mut v = Vec::new();
-        if self.own.is_some() && reg.packages.iter().any(|p| p.games.contains(&self.id)) {
+        if reg.packages.iter().any(|p| p.install_type != "root" && self.in_catalog(p)) {
             v.push("own");
         }
         if self.ts.is_some() {
@@ -579,7 +591,7 @@ fn reconcile(st: &AppState, g: &Game, root: &Path) {
         auto: false,
     };
     // Catalog packages for this game (and catalog loaders used by games added by hand).
-    for p in reg.packages.iter().filter(|p| (p.games.contains(&g.id) || base.contains(&format!("own:{}", p.id))) && !p.detect.is_empty()) {
+    for p in reg.packages.iter().filter(|p| (g.in_catalog(p) || base.contains(&format!("own:{}", p.id))) && !p.detect.is_empty()) {
         let key = format!("own:{}", p.id);
         let layout = Layout::parse(&p.install_type);
         if !p.detect.iter().all(|d| exists(d)) {
@@ -1051,7 +1063,7 @@ async fn filters(game_id: String, source: String, st: State<'_, AppState>) -> Cm
         }
         _ => {
             let reg = st.registry.lock().unwrap().clone();
-            let mut cats: Vec<String> = reg.packages.iter().filter(|p| p.games.contains(&g.id)).map(|p| p.category.clone()).filter(|c| !c.is_empty()).collect();
+            let mut cats: Vec<String> = reg.packages.iter().filter(|p| g.in_catalog(p)).map(|p| p.category.clone()).filter(|c| !c.is_empty()).collect();
             cats.sort();
             cats.dedup();
             let sections = json!([{ "id": "mods", "name": "Mods", "slug": "mods" }, { "id": "modpacks", "name": "Modpacks", "slug": "modpacks" }]);
@@ -1109,7 +1121,7 @@ async fn browse(game_id: String, source: String, q: String, page: u32, ordering:
             let items: Vec<_> = reg
                 .packages
                 .iter()
-                .filter(|p| p.games.contains(&g.id))
+                .filter(|p| g.in_catalog(p))
                 .filter(|p| ql.is_empty() || p.name.to_lowercase().contains(&ql) || p.description.to_lowercase().contains(&ql))
                 .filter(|p| match section.as_deref() {
                     Some("modpacks") => p.install_type == "modpack",

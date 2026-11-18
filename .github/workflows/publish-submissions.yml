@@ -1,0 +1,38 @@
+# After a maintainer merges a mod submission into main: copy its zip into this repo's releases
+# (so it keeps working even if the author deletes theirs) and add it to registry/registry.json.
+name: Publish merged mod submissions
+
+on:
+  push:
+    branches: [main]
+    paths: ["submissions/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-submissions
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python scripts/check_submission.py --publish
+      - name: Commit the catalog
+        run: |
+          if git diff --quiet registry/registry.json; then echo "Catalog unchanged."; exit 0; fi
+          git config user.name "modnest-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add registry/registry.json
+          git commit -m "Publish merged mod submissions"
+          git pull --rebase origin main
+          git push

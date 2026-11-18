@@ -1,0 +1,21 @@
+# Runs on every pull request that adds or changes a mod submission.
+# Read-only: it only downloads the submitted zip and checks it. The result appears on the PR.
+name: Check mod submission
+
+on:
+  pull_request:
+    paths: ["submissions/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check submissions
+        run: python scripts/check_submission.py

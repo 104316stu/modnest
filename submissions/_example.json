@@ -1,0 +1,17 @@
+{
+    "id": "my-cool-mod",
+    "name": "My Cool Mod",
+    "author": "your-github-name",
+    "description": "One or two sentences about what the mod does.",
+    "version": "1.0.0",
+    "games": ["chained-beasts"],
+    "category": "Gameplay",
+    "installType": "plugin",
+    "installFolder": "MyCoolMod",
+    "dependencies": ["chainedforge"],
+    "download": "https://github.com/your-github-name/my-cool-mod/releases/download/v1.0.0/my-cool-mod.zip",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "sourceCode": "https://github.com/your-github-name/my-cool-mod",
+    "website": "https://github.com/your-github-name/my-cool-mod",
+    "icon": "https://raw.githubusercontent.com/your-github-name/my-cool-mod/main/icon.png"
+}

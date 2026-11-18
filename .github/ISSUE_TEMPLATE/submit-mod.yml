@@ -1,0 +1,35 @@
+name: Submit a mod
+description: Suggest a mod for the ModNest catalog (no Git needed)
+title: "Mod submission: "
+labels: ["mod submission"]
+body:
+  - type: markdown
+    attributes:
+      value: "Using an AI coding assistant? It can open the pull request itself by following AGENTS.md. Otherwise fill this in and a maintainer will add it."
+  - type: input
+    id: name
+    attributes: { label: Mod name and version, placeholder: "My Cool Mod 1.0.0" }
+    validations: { required: true }
+  - type: input
+    id: game
+    attributes: { label: Game, placeholder: "Chained Beasts" }
+    validations: { required: true }
+  - type: input
+    id: zip
+    attributes: { label: Download link to the mod's zip, description: "Only the mod: no mod loader, no .exe" }
+    validations: { required: true }
+  - type: input
+    id: source
+    attributes: { label: Source code link }
+    validations: { required: true }
+  - type: textarea
+    id: about
+    attributes: { label: What does it do? Does it need other mods? }
+    validations: { required: true }
+  - type: checkboxes
+    id: ok
+    attributes:
+      label: Confirm
+      options:
+        - label: It's my mod, or I have the author's permission
+          required: true

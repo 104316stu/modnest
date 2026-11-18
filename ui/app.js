@@ -708,7 +708,7 @@ async function showMyStuff() {
       ${mgr.length ? `<div class="group-title">In Thunderstore Mod Manager on this PC</div><div style="padding:0 32px">${mgr.map((p) => `
         <div class="row" style="margin-bottom:4px"><div class="row-head" style="cursor:default"><div class="row-main"><div class="row-title"><span class="t">${esc(p.name)}</span><span class="a">${esc(p.gameName)}</span></div><div class="row-desc">${esc(p.mods.slice(0, 10).join(' · '))}</div></div>
         <span class="muted small">${plural(p.count, 'mod')}</span><button class="btn sm" data-act="import-mgr-any" data-g="${esc(p.gameId)}" data-name="${esc(p.name)}">Import</button></div></div>`).join('')}</div>` : ''}
-      <div class="group-title">Published by you <span class="pill line">ModNest catalog</span> <a href="#" data-act="link" data-url="${esc(data.repo)}" style="color:var(--accent-hi);font-weight:400">GitHub ↗</a></div>
+      <div class="group-title">Published by you <span class="pill line">ModNest catalog</span> <a href="#" data-act="link" data-url="${esc(data.repo)}" style="color:var(--accent-hi);font-weight:400">GitHub ↗</a> <a href="#" data-act="link" data-url="${esc(data.repo)}/blob/main/CONTRIBUTING.md" style="color:var(--accent-hi);font-weight:400">How others can add mods ↗</a></div>
       <div style="padding:0 32px">${pubBlock || '<div class="empty">Nothing published yet.</div>'}</div>
     </div>`;
 }

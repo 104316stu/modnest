@@ -26,6 +26,12 @@ and mods can be switched off, updated or removed with one click.
 - **Auto-update:** mods update when you open a game; the app updates itself from GitHub Releases.
 - Finds your games by reading Steam's own library files, on every drive.
 
+## Community mods (pull requests)
+
+Anyone can suggest a mod: one `submissions/<id>.json` file in a pull request ([AGENTS.md](AGENTS.md) for AI agents,
+[CONTRIBUTING.md](CONTRIBUTING.md) for people). GitHub checks it automatically; when you merge it, GitHub copies the zip into this
+repo's releases and adds it to the catalog. Check one yourself: `python scripts/check_submission.py submissions/<id>.json`.
+
 ## Chained Beasts for friends (no ModNest needed)
 
 Send this link: **https://github.com/104316stu/modnest/releases/download/chained-beasts-setup/ChainedBeasts-Mods-Setup.exe**
