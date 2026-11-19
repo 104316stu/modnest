@@ -227,9 +227,9 @@
                          "games":  [
                                        "ts-rounds"
                                    ],
-                         "name":  "Faster Startup",
+                         "name":  "ROUNDS Optimizer",
                          "author":  "104316stu",
-                         "description":  "Makes ROUNDS start much faster with big modpacks (58 s to 34 s with 122 mods) and stops \u0027Not Responding\u0027 while it loads: batches config saves, pauses the garbage collector during loading, keeps loading when alt-tabbed. Gameplay unchanged.",
+                         "description":  "Makes modded ROUNDS start faster (58 s to 34 s with 122 mods) and run smoother: hidden card templates stop running scripts every frame, GearUP bullet effects only update when needed, known crashes in other mods are prevented (they dropped bullet hits online), no \u0027Not Responding\u0027 while loading. Gameplay unchanged.",
                          "version":  "1.0.0",
                          "category":  "Framework",
                          "installType":  "plugin",
