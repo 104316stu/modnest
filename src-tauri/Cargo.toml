@@ -1,6 +1,6 @@
 [package]
 name = "modnest"
-version = "0.2.4"
+version = "0.2.5"
 description = "ModNest mod manager"
 edition = "2021"
 default-run = "modnest"
@@ -36,6 +36,7 @@ sha2 = "0.10"
 anyhow = "1"
 url = "2"
 base64 = "0.22"
+flate2 = "1"
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 
 [target.'cfg(windows)'.dependencies]

@@ -193,3 +193,36 @@ fn plain_folder_and_single_file_installs() {
     assert!(write_single(&game, Layout::Folder, "Mods", "", b"x").is_err());
     let _ = std::fs::remove_dir_all(&game);
 }
+
+#[test]
+fn short_codes_round_trip_and_old_codes_still_work() {
+    use modnest_lib::profiles::{decode, encode, encode_v1};
+    use modnest_lib::store::ProfileMod;
+    let pm = |k: &str, on: bool| ProfileMod { key: k.into(), title: String::new(), version: "1.2.3".into(), enabled: on };
+    let mods = vec![pm("ts:Pykess-ModdingUtils", true), pm("ts:willis81808-UnboundLib", false), pm("own:chainedforge", true), pm("cf:1234", true), pm("local:mine", true)];
+
+    let code = encode("ts-rounds", "fvxzd expanded GG", &mods);
+    assert!(code.starts_with("MN2-"));
+    let (g, n, m) = decode(&code).unwrap();
+    assert_eq!((g.as_str(), n.as_str()), ("ts-rounds", "fvxzd expanded GG"));
+    let got: Vec<(String, bool)> = m.iter().map(|x| (x.key.clone(), x.enabled)).collect();
+    assert_eq!(got.len(), 4, "files from disk aren't shareable");
+    for want in [("ts:Pykess-ModdingUtils", true), ("ts:willis81808-UnboundLib", false), ("own:chainedforge", true), ("cf:1234", true)] {
+        assert!(got.contains(&(want.0.to_string(), want.1)), "missing {want:?}");
+    }
+
+    // Chat apps wrap long codes: spaces and line breaks are ignored.
+    let wrapped: String = code.chars().enumerate().flat_map(|(i, c)| if i % 40 == 39 { vec![c, '\n', ' '] } else { vec![c] }).collect();
+    assert_eq!(decode(&wrapped).unwrap().2.len(), 4);
+
+    // Codes shared before this change still import.
+    let old = encode_v1("ts-rounds", "Old", &mods);
+    assert!(old.starts_with("MODNEST1-"));
+    assert_eq!(decode(&old).unwrap().2.len(), 4);
+
+    // A big profile: the new code is far shorter than the old one.
+    let many: Vec<ProfileMod> = (0..130).map(|i| pm(&format!("ts:{}-SomeCardPack{i}", ["Pykess", "willis81808", "BossSloth", "Root"][i % 4]), true)).collect();
+    let (new_len, old_len) = (encode("ts-rounds", "Big", &many).len(), encode_v1("ts-rounds", "Big", &many).len());
+    assert!(new_len * 3 < old_len, "new {new_len} vs old {old_len}");
+    assert!(decode("MN2-not-a-real-code").is_none());
+}

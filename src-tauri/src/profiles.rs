@@ -20,21 +20,61 @@ struct Packed {
     m: Vec<(String, String, bool)>,
 }
 
+/// Short code: "MN2-" + base64url(deflate(text)). The text is the game id and profile name on the
+/// first line, then one mod per line, sorted, with "ts:" left out (almost every mod has it) and "!"
+/// for mods that are switched off. Versions aren't stored: ModNest installs the newest anyway.
+/// Mods installed from files on this PC can't be shared, so they're left out.
+const PREFIX2: &str = "MN2-";
+
 pub fn encode(game_id: &str, name: &str, mods: &[ProfileMod]) -> String {
+    use flate2::{write::DeflateEncoder, Compression};
+    use std::io::Write as _;
+    let mut lines: Vec<String> = mods
+        .iter()
+        .filter(|m| !m.key.starts_with("local:"))
+        .map(|m| format!("{}{}", if m.enabled { "" } else { "!" }, m.key.strip_prefix("ts:").unwrap_or(&m.key)))
+        .collect();
+    lines.sort_by(|a, b| a.trim_start_matches('!').cmp(b.trim_start_matches('!')));
+    let text = format!("{}\t{}\n{}", game_id, name.replace(['\t', '\n'], " "), lines.join("\n"));
+    let mut z = DeflateEncoder::new(Vec::new(), Compression::best());
+    let _ = z.write_all(text.as_bytes());
+    format!("{PREFIX2}{}", B64.encode(z.finish().unwrap_or_default()))
+}
+
+/// (game id, profile name, mods). Reads both the short "MN2-" codes and the older "MODNEST1-" ones,
+/// and ignores spaces or line breaks that chat apps add when they wrap a long code.
+pub fn decode(code: &str) -> Option<(String, String, Vec<ProfileMod>)> {
+    let code: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+    if let Some(body) = code.strip_prefix(PREFIX2) {
+        use std::io::Read as _;
+        let mut text = String::new();
+        flate2::read::DeflateDecoder::new(&B64.decode(body).ok()?[..]).take(2_000_000).read_to_string(&mut text).ok()?;
+        let mut lines = text.lines();
+        let (g, n) = lines.next()?.split_once('\t')?;
+        let mods = lines
+            .filter(|l| !l.is_empty())
+            .map(|l| {
+                let (enabled, k) = match l.strip_prefix('!') { Some(k) => (false, k), None => (true, l) };
+                let key = if k.contains(':') { k.to_string() } else { format!("ts:{k}") };
+                ProfileMod { title: title_of(&key), key, version: String::new(), enabled }
+            })
+            .collect();
+        return Some((g.to_string(), n.to_string(), mods));
+    }
+    let body = code.strip_prefix(PREFIX)?;
+    let p: Packed = serde_json::from_slice(&B64.decode(body).ok()?).ok()?;
+    let mods = p.m.into_iter().map(|(key, version, enabled)| ProfileMod { title: title_of(&key), key, version, enabled }).collect();
+    Some((p.g, p.n, mods))
+}
+
+/// The old format, kept so codes people already shared still import.
+pub fn encode_v1(game_id: &str, name: &str, mods: &[ProfileMod]) -> String {
     let p = Packed {
         g: game_id.into(),
         n: name.into(),
         m: mods.iter().filter(|m| !m.key.starts_with("local:")).map(|m| (m.key.clone(), m.version.clone(), m.enabled)).collect(),
     };
     format!("{PREFIX}{}", B64.encode(serde_json::to_vec(&p).unwrap_or_default()))
-}
-
-/// (game id, profile name, mods)
-pub fn decode(code: &str) -> Option<(String, String, Vec<ProfileMod>)> {
-    let body = code.trim().strip_prefix(PREFIX)?;
-    let p: Packed = serde_json::from_slice(&B64.decode(body.trim()).ok()?).ok()?;
-    let mods = p.m.into_iter().map(|(key, version, enabled)| ProfileMod { title: title_of(&key), key, version, enabled }).collect();
-    Some((p.g, p.n, mods))
 }
 
 fn title_of(key: &str) -> String {
