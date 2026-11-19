@@ -44,6 +44,8 @@ struct AppState {
     cf_games: Mutex<Vec<curseforge::CfGame>>,
     /// Latest known version per "gameId|key", filled by check_updates.
     latest: Mutex<HashMap<String, String>>,
+    /// GitHub's ETag for the catalog, so an unchanged catalog comes back as a tiny "not modified".
+    catalog_etag: Mutex<Option<String>>,
     /// Only one change to a game folder at a time.
     busy: tauri::async_runtime::Mutex<()>,
     data_dir: PathBuf,
@@ -1766,6 +1768,37 @@ async fn repair_dependencies(app: AppHandle, game_id: String, st: State<'_, AppS
     Ok(state_of(&st, &g))
 }
 
+/// Checks GitHub for a newer catalog while ModNest is running (new mods, new versions).
+/// Returns what changed so the UI can refresh without a restart.
+#[tauri::command]
+async fn refresh_catalog(st: State<'_, AppState>) -> CmdResult<serde_json::Value> {
+    let etag = st.catalog_etag.lock().unwrap().clone();
+    let (reg, text, tag) = match registry::fetch(etag.as_deref()).await {
+        Ok(registry::Fetched::Unchanged) => return Ok(json!({ "changed": false })),
+        Ok(registry::Fetched::New(reg, text, tag)) => (reg, text, tag),
+        Err(e) => return Ok(json!({ "changed": false, "error": e.to_string() })),
+    };
+    *st.catalog_etag.lock().unwrap() = tag;
+    let old = st.registry.lock().unwrap().clone();
+    if serde_json::to_value(&old).ok() == serde_json::to_value(&reg).ok() {
+        return Ok(json!({ "changed": false }));
+    }
+    let _ = std::fs::create_dir_all(&st.data_dir);
+    let _ = std::fs::write(st.data_dir.join("registry-cache.json"), text);
+    let mut added = Vec::new();
+    let mut updated = Vec::new();
+    for p in reg.packages.iter().filter(|p| p.install_type != "root") {
+        match old.package(&p.id) {
+            None => added.push(json!({ "id": p.id, "name": p.name, "version": p.version, "games": p.games })),
+            Some(o) if o.version != p.version => updated.push(json!({ "id": p.id, "name": p.name, "version": p.version, "games": p.games })),
+            _ => {}
+        }
+    }
+    *st.registry.lock().unwrap() = reg;
+    let games: Vec<GameView> = all_games(&st).iter().map(|g| view(&st, g)).collect();
+    Ok(json!({ "changed": true, "added": added, "updated": updated, "games": games }))
+}
+
 // ---------- commands: CurseForge key, games added by hand, My stuff ----------
 
 /// Saves the CurseForge API key after checking it works, then loads CurseForge's games.
@@ -1990,6 +2023,7 @@ pub fn run() {
                 registry: Mutex::new(Registry::bundled()),
                 steam: Mutex::new(HashMap::new()),
                 latest: Mutex::new(HashMap::new()),
+                catalog_etag: Mutex::new(None),
                 communities: Mutex::new(thunderstore::known()),
                 cf_games: Mutex::new(Vec::new()),
                 busy: tauri::async_runtime::Mutex::new(()),
@@ -2018,6 +2052,7 @@ pub fn run() {
             close_game,
             game_running,
             repair_dependencies,
+            refresh_catalog,
             clear_cache,
             save_profile,
             new_profile,

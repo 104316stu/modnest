@@ -232,16 +232,56 @@ async function autoMaintain(id) {
   try {
     const wantsLoader = ui.state.game.source === 'own' || ui.state.mods.length > 0;
     if (ui.settings.autoInstallLoader && wantsLoader && ui.state.baseMissing.length) setState(await invoke('ensure_base', { gameId: id }));
+  } catch (e) { if (!String(e).startsWith('GAME_RUNNING|')) fail(e); }
+  await checkAndUpdate(id);
+}
+
+// Looks for newer versions of this game's mods; installs them if "Keep mods up to date" is on.
+// Quietly waits while the game is running (mod files are locked then).
+async function checkAndUpdate(id) {
+  if (!ui.state?.game.installed || ui.checking) return;
+  ui.checking = true;
+  try {
     const st = await invoke('check_updates', { gameId: id });
     setState(st);
     const outdated = st.mods.filter((m) => m.updateAvailable).map((m) => m.key);
-    if (ui.settings.autoUpdateMods && outdated.length) {
+    if (ui.settings.autoUpdateMods && outdated.length && !(await invoke('game_running', { gameId: id }))) {
       ui.batch = { name: 'updates', done: new Set() };
       try { setState(await invoke('update_mods', { gameId: id, keys: outdated })); } finally { dismiss('batch'); ui.batch = null; }
       toast('upd' + id, `Updated ${plural(outdated.length, 'mod')}`, { kind: 'ok', ttl: 4000 });
     }
   } catch (e) { if (!String(e).startsWith('GAME_RUNNING|')) fail(e); }
+  finally { ui.checking = false; }
 }
+
+// ---------- live catalog: new and updated mods from GitHub without restarting ----------
+async function refreshCatalog() {
+  ui.lastCatalogCheck = Date.now();
+  let r;
+  try { r = await invoke('refresh_catalog'); } catch { return; }
+  if (!r.changed) return;
+  ui.games = r.games;
+  const names = (list) => list.map((p) => `${p.name} ${p.version}`);
+  const added = names(r.added || []), updated = names(r.updated || []);
+  if (added.length || updated.length) {
+    toast('catalog', added.length ? `New in the catalog: ${added.slice(0, 3).join(', ')}${added.length > 3 ? ` +${added.length - 3}` : ''}` : 'Catalog updated',
+      { text: updated.length ? `Updated: ${updated.slice(0, 3).join(', ')}${updated.length > 3 ? ` +${updated.length - 3}` : ''}` : '', kind: 'ok', ttl: 6000 });
+  }
+  // Catalog filters and lists for open pages are out of date now.
+  Object.keys(ui.filters).filter((k) => k.endsWith('|own')).forEach((k) => delete ui.filters[k]);
+  if (ui.browse && ui.browse.source === 'own') ui.browse = null;
+  if (ui.view === 'library') return renderLibrary();
+  if (ui.view === 'mine') return showMyStuff();
+  if (ui.view === 'game' && ui.gameId) {
+    const id = ui.gameId;
+    try { setState(await invoke('game_state', { gameId: id })); } catch { /* ignore */ }
+    await checkAndUpdate(id);
+  }
+}
+setInterval(refreshCatalog, 5 * 60 * 1000);
+window.addEventListener('focus', () => { if (Date.now() - (ui.lastCatalogCheck || 0) > 2 * 60 * 1000) refreshCatalog(); });
+// Thunderstore / CurseForge updates for the game you're looking at.
+setInterval(() => { if (ui.view === 'game' && ui.gameId) checkAndUpdate(ui.gameId); }, 15 * 60 * 1000);
 
 function setState(st) {
   if (!st || st.game.id !== ui.gameId) return;
