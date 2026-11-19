@@ -1,0 +1,30 @@
+[package]
+name = "modnest-core"
+version = "0.2.6"
+description = "ModNest engine: games, mods, profiles and catalogs (no UI)"
+edition = "2021"
+
+[lib]
+name = "modnest_core"
+
+[[bin]]
+name = "chained-setup"
+path = "src/bin/chained-setup.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "time"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+anyhow = "1"
+url = "2"
+base64 = "0.22"
+flate2 = "1"
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+open = "5"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

@@ -1,5 +1,5 @@
 // Checks where mod files end up for each kind of package.
-use modnest_lib::installer::*;
+use modnest_core::installer::*;
 use std::path::Path;
 
 fn names(v: &[&str]) -> Vec<String> {
@@ -85,7 +85,7 @@ fn install_disable_enable_remove_roundtrip() {
 fn reads_thunderstore_mod_manager_profiles() {
     // Shape of r2modman / Thunderstore Mod Manager mods.yml
     let yaml = "- manifestVersion: 1\n  name: BepInEx-BepInExPack\n  authorName: BepInEx\n  dependencies: []\n  versionNumber:\n    major: 5\n    minor: 4\n    patch: 2100\n  enabled: true\n- manifestVersion: 1\n  name: notnotnotswipez-MoreCompany\n  dependencies:\n    - BepInEx-BepInExPack-5.4.2100\n  versionNumber:\n    major: 1\n    minor: 9\n    patch: 1\n  enabled: false\n";
-    let mods = modnest_lib::profiles::parse_r2_yaml(yaml);
+    let mods = modnest_core::profiles::parse_r2_yaml(yaml);
     assert_eq!(mods.len(), 2);
     assert_eq!(mods[0].key, "ts:BepInEx-BepInExPack");
     assert_eq!(mods[0].version, "5.4.2100");
@@ -93,20 +93,20 @@ fn reads_thunderstore_mod_manager_profiles() {
     assert!(!mods[1].enabled);
     // export.r2x shape (share codes)
     let r2x = "profileName: Friends\nmods:\n  - name: notnotnotswipez-MoreCompany\n    version:\n      major: 1\n      minor: 9\n      patch: 1\n    enabled: true\n";
-    let mods = modnest_lib::profiles::parse_r2_yaml(r2x);
+    let mods = modnest_core::profiles::parse_r2_yaml(r2x);
     assert_eq!(mods.len(), 1);
     assert_eq!(mods[0].version, "1.9.1");
 }
 
 #[test]
 fn modnest_codes_round_trip() {
-    use modnest_lib::store::ProfileMod;
+    use modnest_core::store::ProfileMod;
     let mods = vec![
         ProfileMod { key: "ts:A-B".into(), title: "B".into(), version: "1.0.0".into(), enabled: true },
         ProfileMod { key: "local:x".into(), title: "x".into(), version: "1".into(), enabled: true },
     ];
-    let code = modnest_lib::profiles::encode("ts-repo", "My pack", &mods);
-    let (g, n, m) = modnest_lib::profiles::decode(&code).unwrap();
+    let code = modnest_core::profiles::encode("ts-repo", "My pack", &mods);
+    let (g, n, m) = modnest_core::profiles::decode(&code).unwrap();
     assert_eq!((g.as_str(), n.as_str(), m.len()), ("ts-repo", "My pack", 1), "files from disk aren't shareable");
 }
 
@@ -135,7 +135,7 @@ fn launch_args_turn_mods_on_or_off() {
 
 #[test]
 fn reads_curseforge_mods() {
-    use modnest_lib::curseforge::{listing_from, mod_from};
+    use modnest_core::curseforge::{listing_from, mod_from};
     // Shape of a CurseForge API mod (trimmed).
     let m = serde_json::json!({
         "id": 1234, "name": "Better Thing", "summary": "Makes things better", "downloadCount": 5100.0, "thumbsUpCount": 7,
@@ -165,7 +165,7 @@ fn reads_curseforge_mods() {
 
 #[test]
 fn matches_game_names_across_stores() {
-    use modnest_lib::thunderstore::squash;
+    use modnest_core::thunderstore::squash;
     assert_eq!(squash("IRON NEST: Heavy Turret Simulator Demo"), squash("IRON NEST: Heavy Turret Simulator"));
     assert_eq!(squash("R.E.P.O."), "repo");
     assert_eq!(squash("Liar's Bar"), squash("Liars Bar"));
@@ -196,8 +196,8 @@ fn plain_folder_and_single_file_installs() {
 
 #[test]
 fn short_codes_round_trip_and_old_codes_still_work() {
-    use modnest_lib::profiles::{decode, encode, encode_v1};
-    use modnest_lib::store::ProfileMod;
+    use modnest_core::profiles::{decode, encode, encode_v1};
+    use modnest_core::store::ProfileMod;
     let pm = |k: &str, on: bool| ProfileMod { key: k.into(), title: String::new(), version: "1.2.3".into(), enabled: on };
     let mods = vec![pm("ts:Pykess-ModdingUtils", true), pm("ts:willis81808-UnboundLib", false), pm("own:chainedforge", true), pm("cf:1234", true), pm("local:mine", true)];
 

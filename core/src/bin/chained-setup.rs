@@ -2,9 +2,9 @@
 //! Finds the game, installs BepInEx + ChainedForge + its packs and the host's pack settings,
 //! all downloaded from the ModNest catalog on GitHub. Run it again to update; it can also remove the mods.
 use anyhow::{bail, Context, Result};
-use modnest_lib::installer::{self, Layout};
-use modnest_lib::registry::{OwnPackage, Registry};
-use modnest_lib::steam;
+use modnest_core::installer::{self, Layout};
+use modnest_core::registry::{OwnPackage, Registry};
+use modnest_core::steam;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
@@ -56,7 +56,7 @@ fn run() -> Result<()> {
 
     println!("  Getting the latest mod list...");
     let cache = std::env::temp_dir().join("ChainedBeastsModsSetup");
-    let reg = tauri::async_runtime::block_on(Registry::load(&cache));
+    let reg = runtime().block_on(Registry::load(&cache));
     let order = install_order(&reg)?;
     let steps = order.iter().filter(|p| p.install_type != "modpack").count() + 1;
     let mut n = 0;
@@ -132,7 +132,7 @@ fn game_running() -> bool {
 fn fetch(p: &OwnPackage, label: &str) -> Result<Vec<u8>> {
     let label = label.to_string();
     let mut last_pct = u32::MAX;
-    let bytes = tauri::async_runtime::block_on(installer::download(&p.download, |f| {
+    let bytes = runtime().block_on(installer::download(&p.download, |f| {
         // Redraw only when the percentage changes.
         if f >= 0.0 && (f * 100.0) as u32 != last_pct {
             last_pct = (f * 100.0) as u32;
@@ -193,4 +193,10 @@ fn remove(root: &Path) -> Result<()> {
     println!("\n  Removed. Chained Beasts now starts without mods.");
     println!("  (BepInEx is left in place but switched off. Run this file again any time to reinstall.)");
     Ok(())
+}
+
+/// One background runtime for the downloads.
+fn runtime() -> &'static tokio::runtime::Runtime {
+    static RT: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
+    RT.get_or_init(|| tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("tokio runtime"))
 }
