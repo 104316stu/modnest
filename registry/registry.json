@@ -1,224 +1,226 @@
 {
-    "schema": 1,
-    "updated": "2026-11-18",
-    "games": [
-        {
-            "id": "chained-beasts",
-            "name": "Chained Beasts",
-            "steamAppIds": [
-                3569420
-            ],
-            "exe": "ChainedBeasts.exe",
-            "loader": "BepInEx 6 IL2CPP",
-            "accent": "#c2410c",
-            "basePackages": [
-                "bepinex-6-il2cpp",
-                "chainedforge"
-            ]
-        },
-        {
-            "id": "iron-nest",
-            "name": "IRON NEST: Heavy Turret Simulator",
-            "steamAppIds": [
-                4300500
-            ],
-            "loader": "BepInEx 6 IL2CPP",
-            "accent": "#0e7490",
-            "basePackages": [
-                "bepinex-6-il2cpp"
-            ]
-        }
-    ],
-    "packages": [
-        {
-            "id": "bepinex-6-il2cpp",
-            "games": [
-                "chained-beasts",
-                "iron-nest"
-            ],
-            "name": "BepInEx 6 (IL2CPP)",
-            "author": "BepInEx",
-            "description": "The mod loader every mod here needs. Installed automatically.",
-            "version": "6.0.0-be.793",
-            "category": "Loader",
-            "installType": "root",
-            "download": "https://builds.bepinex.dev/projects/bepinex_be/793/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.793%2Bdbc82f0.zip",
-            "detect": [
-                "winhttp.dll",
-                "BepInEx/core/BepInEx.Unity.IL2CPP.dll"
-            ],
-            "website": "https://github.com/BepInEx/BepInEx"
-        },
-        {
-            "id": "chainedforge",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "ChainedForge",
-            "author": "ChainedForge",
-            "description": "Mod framework for Chained Beasts: Mods menu, Endless Runs (Risk of Rain scaling, Continue after victory), card limits, Tab run stats, testing mode. Needed by every Chained Beasts pack.",
-            "version": "0.2.0",
-            "category": "Framework",
-            "installType": "plugin",
-            "installFolder": "ChainedForge",
-            "dependencies": [
-                "bepinex-6-il2cpp"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/chainedforge-0.2.0/chainedforge-0.2.0.zip",
-            "detect": [
-                "BepInEx/plugins/ChainedForge/ChainedForge.dll"
-            ],
-            "sha256": "2a68e2e18ffc56a21af7f59657b0079c2b59087191420a91222b4bd595b745ff",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
-        },
-        {
-            "id": "iron-nest-multiplayer",
-            "games": [
-                "iron-nest"
-            ],
-            "name": "Iron Nest Multiplayer",
-            "author": "IronNestMP",
-            "description": "Online co-op over Steam. Press F8 in game to host or join a friend. Everyone needs the same version.",
-            "version": "0.2.1",
-            "category": "Multiplayer",
-            "installType": "plugin",
-            "installFolder": "IronNestMP",
-            "dependencies": [
-                "bepinex-6-il2cpp"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/iron-nest-multiplayer-0.2.1/iron-nest-multiplayer-0.2.1.zip",
-            "detect": [
-                "BepInEx/plugins/IronNestMP/IronNestMP.dll"
-            ],
-            "sha256": "6fa8ee5dc64e2704f0342e7f1c91b27d78cf6637f02195944956056a18db92b7"
-        },
-        {
-            "id": "cf-arena-deck",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "Arena Deck",
-            "author": "ChainedForge",
-            "description": "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, gambles, jackpots, curses and the cards that cleanse them.",
-            "version": "1.0.0",
-            "category": "Cards",
-            "installType": "cf-pack",
-            "installFolder": "ArenaDeck",
-            "dependencies": [
-                "chainedforge"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/cf-arena-deck-1.0.0/cf-arena-deck-1.0.0.zip",
-            "detect": [
-                "BepInEx/ChainedForgePacks/ArenaDeck/pack.json"
-            ],
-            "sha256": "b2b20061b54f3581227385a4d8bea8906df5a5943a77ce876c8d8d71becdc41e",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-arena-deck.png"
-        },
-        {
-            "id": "cf-rounds-and-rain",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "Rounds & Rain",
-            "author": "ChainedForge",
-            "description": "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather, Blood Vial, Fungal Bloom, Reaper's Edge, Shattered Glass, a coin flip and nasty curses.",
-            "version": "1.0.0",
-            "category": "Cards",
-            "installType": "cf-pack",
-            "installFolder": "RoundsAndRain",
-            "dependencies": [
-                "chainedforge"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/cf-rounds-and-rain-1.0.0/cf-rounds-and-rain-1.0.0.zip",
-            "detect": [
-                "BepInEx/ChainedForgePacks/RoundsAndRain/pack.json"
-            ],
-            "sha256": "a2c9d044685bce2fe3eafaae0abf69962adfd9bc2d4546e565a6997992979afa",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-rounds-and-rain.png"
-        },
-        {
-            "id": "cf-starter-pack",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "ChainedForge Starter Pack",
-            "author": "ChainedForge",
-            "description": "Six new trainer skills (Blood Pact, Iron Hide, Gladiator's Fury...) and the developers' cut skills brought back.",
-            "version": "1.0.0",
-            "category": "Cards",
-            "installType": "cf-pack",
-            "installFolder": "StarterPack",
-            "dependencies": [
-                "chainedforge"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/cf-starter-pack-1.0.0/cf-starter-pack-1.0.0.zip",
-            "detect": [
-                "BepInEx/ChainedForgePacks/StarterPack/pack.json"
-            ],
-            "sha256": "899f8871f5dc4fb3e569969fcb471e74f747954ee1386c0bab91a2e48cb50ccf",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-starter-pack.png"
-        },
-        {
-            "id": "cf-hard-mode",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "Colosseum Hard Mode",
-            "author": "ChainedForge",
-            "description": "Tougher arena: enemies +50% health and +30% damage, a stronger Senate boss, angry crowds throw pots and no starting coins.",
-            "version": "1.0.0",
-            "category": "Difficulty",
-            "installType": "cf-pack",
-            "installFolder": "HardMode",
-            "dependencies": [
-                "chainedforge"
-            ],
-            "download": "https://github.com/104316stu/modnest/releases/download/cf-hard-mode-1.0.0/cf-hard-mode-1.0.0.zip",
-            "detect": [
-                "BepInEx/ChainedForgePacks/HardMode/pack.json"
-            ],
-            "sha256": "05a93635066ba0996d1043bc1da9d168ecff519455875b4eaae8b898574ab1ab",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-hard-mode.png"
-        },
-        {
-            "id": "chained-beasts-complete",
-            "games": [
-                "chained-beasts"
-            ],
-            "name": "Chained Beasts Complete Pack",
-            "author": "ChainedForge",
-            "description": "Everything you need to play together: ChainedForge plus Arena Deck, Rounds & Rain, ChainedForge Starter Pack. Colosseum Hard Mode is left out (it's a difficulty choice); add it separately if the host plays with it.",
-            "version": "1.0.0",
-            "category": "Modpack",
-            "installType": "modpack",
-            "dependencies": [
-                "chainedforge",
-                "cf-arena-deck",
-                "cf-rounds-and-rain",
-                "cf-starter-pack"
-            ],
-            "download": "",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
-        },
-        {
-            "id": "rounds3d",
-            "games": [
-                "ts-rounds"
-            ],
-            "name": "Rounds 3D",
-            "author": "104316stu",
-            "description": "Play ROUNDS as a first-person 3D shooter: real 3D movement and bullets, exact aim, FPS HUD, textures, 3D hazards and breakable boxes, plus a 3D battleground map (needs MapsExtended). Works online and with other mods.",
-            "version": "1.4.0",
-            "category": "Gameplay",
-            "installType": "plugin",
-            "installFolder": "Rounds3D",
-            "dependencies": [],
-            "download": "",
-            "detect": [
-                "BepInEx/plugins/Rounds3D/Rounds3D.dll"
-            ],
-            "sha256": "",
-            "icon": "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/rounds3d.png"
-        }
-    ]
+    "schema":  1,
+    "updated":  "2026-11-19",
+    "games":  [
+                  {
+                      "id":  "chained-beasts",
+                      "name":  "Chained Beasts",
+                      "steamAppIds":  [
+                                          3569420
+                                      ],
+                      "exe":  "ChainedBeasts.exe",
+                      "loader":  "BepInEx 6 IL2CPP",
+                      "accent":  "#c2410c",
+                      "basePackages":  [
+                                           "bepinex-6-il2cpp",
+                                           "chainedforge"
+                                       ]
+                  },
+                  {
+                      "id":  "iron-nest",
+                      "name":  "IRON NEST: Heavy Turret Simulator",
+                      "steamAppIds":  [
+                                          4300500
+                                      ],
+                      "loader":  "BepInEx 6 IL2CPP",
+                      "accent":  "#0e7490",
+                      "basePackages":  [
+                                           "bepinex-6-il2cpp"
+                                       ]
+                  }
+              ],
+    "packages":  [
+                     {
+                         "id":  "bepinex-6-il2cpp",
+                         "games":  [
+                                       "chained-beasts",
+                                       "iron-nest"
+                                   ],
+                         "name":  "BepInEx 6 (IL2CPP)",
+                         "author":  "BepInEx",
+                         "description":  "The mod loader every mod here needs. Installed automatically.",
+                         "version":  "6.0.0-be.793",
+                         "category":  "Loader",
+                         "installType":  "root",
+                         "download":  "https://builds.bepinex.dev/projects/bepinex_be/793/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.793%2Bdbc82f0.zip",
+                         "detect":  [
+                                        "winhttp.dll",
+                                        "BepInEx/core/BepInEx.Unity.IL2CPP.dll"
+                                    ],
+                         "website":  "https://github.com/BepInEx/BepInEx"
+                     },
+                     {
+                         "id":  "chainedforge",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "ChainedForge",
+                         "author":  "ChainedForge",
+                         "description":  "Mod framework for Chained Beasts: Mods menu, Endless Runs (Risk of Rain scaling, Continue after victory), card limits, Tab run stats, testing mode. Needed by every Chained Beasts pack.",
+                         "version":  "0.2.0",
+                         "category":  "Framework",
+                         "installType":  "plugin",
+                         "installFolder":  "ChainedForge",
+                         "dependencies":  [
+                                              "bepinex-6-il2cpp"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.2.0/chainedforge-0.2.0.zip",
+                         "detect":  [
+                                        "BepInEx/plugins/ChainedForge/ChainedForge.dll"
+                                    ],
+                         "sha256":  "2a68e2e18ffc56a21af7f59657b0079c2b59087191420a91222b4bd595b745ff",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
+                     },
+                     {
+                         "id":  "iron-nest-multiplayer",
+                         "games":  [
+                                       "iron-nest"
+                                   ],
+                         "name":  "Iron Nest Multiplayer",
+                         "author":  "IronNestMP",
+                         "description":  "Online co-op over Steam. Press F8 in game to host or join a friend. Everyone needs the same version.",
+                         "version":  "0.2.1",
+                         "category":  "Multiplayer",
+                         "installType":  "plugin",
+                         "installFolder":  "IronNestMP",
+                         "dependencies":  [
+                                              "bepinex-6-il2cpp"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/iron-nest-multiplayer-0.2.1/iron-nest-multiplayer-0.2.1.zip",
+                         "detect":  [
+                                        "BepInEx/plugins/IronNestMP/IronNestMP.dll"
+                                    ],
+                         "sha256":  "6fa8ee5dc64e2704f0342e7f1c91b27d78cf6637f02195944956056a18db92b7"
+                     },
+                     {
+                         "id":  "cf-arena-deck",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Arena Deck",
+                         "author":  "ChainedForge",
+                         "description":  "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, gambles, jackpots, curses and the cards that cleanse them.",
+                         "version":  "1.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "ArenaDeck",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-arena-deck-1.0.0/cf-arena-deck-1.0.0.zip",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/ArenaDeck/pack.json"
+                                    ],
+                         "sha256":  "b2b20061b54f3581227385a4d8bea8906df5a5943a77ce876c8d8d71becdc41e",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-arena-deck.png"
+                     },
+                     {
+                         "id":  "cf-rounds-and-rain",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Rounds \u0026 Rain",
+                         "author":  "ChainedForge",
+                         "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather, Blood Vial, Fungal Bloom, Reaper\u0027s Edge, Shattered Glass, a coin flip and nasty curses.",
+                         "version":  "1.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "RoundsAndRain",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-rounds-and-rain-1.0.0/cf-rounds-and-rain-1.0.0.zip",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/RoundsAndRain/pack.json"
+                                    ],
+                         "sha256":  "a2c9d044685bce2fe3eafaae0abf69962adfd9bc2d4546e565a6997992979afa",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-rounds-and-rain.png"
+                     },
+                     {
+                         "id":  "cf-starter-pack",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "ChainedForge Starter Pack",
+                         "author":  "ChainedForge",
+                         "description":  "Six new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury...) and the developers\u0027 cut skills brought back.",
+                         "version":  "1.0.0",
+                         "category":  "Cards",
+                         "installType":  "cf-pack",
+                         "installFolder":  "StarterPack",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-starter-pack-1.0.0/cf-starter-pack-1.0.0.zip",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/StarterPack/pack.json"
+                                    ],
+                         "sha256":  "899f8871f5dc4fb3e569969fcb471e74f747954ee1386c0bab91a2e48cb50ccf",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-starter-pack.png"
+                     },
+                     {
+                         "id":  "cf-hard-mode",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Colosseum Hard Mode",
+                         "author":  "ChainedForge",
+                         "description":  "Tougher arena: enemies +50% health and +30% damage, a stronger Senate boss, angry crowds throw pots and no starting coins.",
+                         "version":  "1.0.0",
+                         "category":  "Difficulty",
+                         "installType":  "cf-pack",
+                         "installFolder":  "HardMode",
+                         "dependencies":  [
+                                              "chainedforge"
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-hard-mode-1.0.0/cf-hard-mode-1.0.0.zip",
+                         "detect":  [
+                                        "BepInEx/ChainedForgePacks/HardMode/pack.json"
+                                    ],
+                         "sha256":  "05a93635066ba0996d1043bc1da9d168ecff519455875b4eaae8b898574ab1ab",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-hard-mode.png"
+                     },
+                     {
+                         "id":  "chained-beasts-complete",
+                         "games":  [
+                                       "chained-beasts"
+                                   ],
+                         "name":  "Chained Beasts Complete Pack",
+                         "author":  "ChainedForge",
+                         "description":  "Everything you need to play together: ChainedForge plus Arena Deck, Rounds \u0026 Rain, ChainedForge Starter Pack. Colosseum Hard Mode is left out (it\u0027s a difficulty choice); add it separately if the host plays with it.",
+                         "version":  "1.0.0",
+                         "category":  "Modpack",
+                         "installType":  "modpack",
+                         "dependencies":  [
+                                              "chainedforge",
+                                              "cf-arena-deck",
+                                              "cf-rounds-and-rain",
+                                              "cf-starter-pack"
+                                          ],
+                         "download":  "",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
+                     },
+                     {
+                         "id":  "rounds3d",
+                         "games":  [
+                                       "ts-rounds"
+                                   ],
+                         "name":  "Rounds 3D",
+                         "author":  "104316stu",
+                         "description":  "Play ROUNDS as a first-person 3D shooter: real 3D movement and bullets, exact aim, FPS HUD, textures, 3D hazards and breakable boxes, plus a 3D battleground map (needs MapsExtended). Works online and with other mods.",
+                         "version":  "1.4.0",
+                         "category":  "Gameplay",
+                         "installType":  "plugin",
+                         "installFolder":  "Rounds3D",
+                         "dependencies":  [
+
+                                          ],
+                         "download":  "https://github.com/104316stu/modnest/releases/download/rounds3d-1.4.0/rounds3d-1.4.0.zip",
+                         "detect":  [
+                                        "BepInEx/plugins/Rounds3D/Rounds3D.dll"
+                                    ],
+                         "sha256":  "fb24da1186396d020ccf10b6099023e028b721225d84cf759f95305bcb46f29f",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/rounds3d.png"
+                     }
+                 ]
 }
