@@ -221,6 +221,28 @@
                                     ],
                          "sha256":  "2a116a0af504e5075392f8e693293abae911e3874e1d9d03592bb2f34df2c05d",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/rounds3d.png"
+                     },
+                     {
+                         "id":  "fasterstartup",
+                         "games":  [
+                                       "ts-rounds"
+                                   ],
+                         "name":  "Faster Startup",
+                         "author":  "104316stu",
+                         "description":  "Makes ROUNDS start much faster with big modpacks (58 s to 34 s with 122 mods) and stops \u0027Not Responding\u0027 while it loads: batches config saves, pauses the garbage collector during loading, keeps loading when alt-tabbed. Gameplay unchanged.",
+                         "version":  "0.0.0",
+                         "category":  "Framework",
+                         "installType":  "plugin",
+                         "installFolder":  "FasterStartup",
+                         "dependencies":  [
+
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/plugins/FasterStartup/FasterStartup.dll"
+                                    ],
+                         "sha256":  "",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/fasterstartup.png"
                      }
                  ]
 }
