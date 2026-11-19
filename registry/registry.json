@@ -230,18 +230,18 @@
                          "name":  "ROUNDS Optimizer",
                          "author":  "104316stu",
                          "description":  "Makes modded ROUNDS start faster (58 s to 34 s with 122 mods) and run smoother: hidden card templates stop running scripts every frame, GearUP bullet effects only update when needed, known crashes in other mods are prevented (they dropped bullet hits online), no \u0027Not Responding\u0027 while loading. Gameplay unchanged.",
-                         "version":  "2.0.4",
+                         "version":  "2.0.5",
                          "category":  "Framework",
                          "installType":  "plugin",
                          "installFolder":  "FasterStartup",
                          "dependencies":  [
 
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/fasterstartup-2.0.4/fasterstartup-2.0.4.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/fasterstartup-2.0.5/fasterstartup-2.0.5.zip",
                          "detect":  [
                                         "BepInEx/plugins/FasterStartup/FasterStartup.dll"
                                     ],
-                         "sha256":  "1693bfcca527ecc4e274945bc9f2dbc6059c813de25dfbc0d3b2311717b2298d",
+                         "sha256":  "7688899d5cb42f41fe86260401a5ad3a07c9b5eec4f347554ed792b31699537a",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/fasterstartup.png"
                      }
                  ]
