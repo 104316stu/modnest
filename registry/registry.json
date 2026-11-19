@@ -243,6 +243,28 @@
                                     ],
                          "sha256":  "7688899d5cb42f41fe86260401a5ad3a07c9b5eec4f347554ed792b31699537a",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/fasterstartup.png"
+                     },
+                     {
+                         "id":  "logshare",
+                         "games":  [
+                                       "ts-rounds"
+                                   ],
+                         "name":  "Log Share",
+                         "author":  "104316stu",
+                         "description":  "Opt-in multiplayer troubleshooting: press F8 to send your game logs and a snapshot of your game\u0027s state (map, card pick, frozen players, mod list) to the host. The host\u0027s F8 collects them from everyone. Saved in BepInEx/shared-logs. Can be switched off in its config.",
+                         "version":  "0.0.0",
+                         "category":  "Framework",
+                         "installType":  "plugin",
+                         "installFolder":  "LogShare",
+                         "dependencies":  [
+
+                                          ],
+                         "download":  "",
+                         "detect":  [
+                                        "BepInEx/plugins/LogShare/LogShare.dll"
+                                    ],
+                         "sha256":  "",
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/logshare.png"
                      }
                  ]
 }
