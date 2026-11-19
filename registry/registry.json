@@ -208,18 +208,18 @@
                          "name":  "Rounds 3D",
                          "author":  "104316stu",
                          "description":  "Play ROUNDS as a first-person 3D shooter: real 3D movement and bullets, exact aim, FPS HUD, textures, 3D hazards and breakable boxes, plus a 3D battleground map (needs MapsExtended). Works online and with other mods.",
-                         "version":  "1.5.0",
+                         "version":  "1.5.1",
                          "category":  "Gameplay",
                          "installType":  "plugin",
                          "installFolder":  "Rounds3D",
                          "dependencies":  [
 
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/rounds3d-1.5.0/rounds3d-1.5.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/rounds3d-1.5.1/rounds3d-1.5.1.zip",
                          "detect":  [
                                         "BepInEx/plugins/Rounds3D/Rounds3D.dll"
                                     ],
-                         "sha256":  "82dbf1b022a5c1401945857cc941dc0f1b23cfe80a67072694016cb4a075d44f",
+                         "sha256":  "63c70868b8bf147251f888ae1de94ccbf23a05fd6237bda46e156bfb06e74285",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/rounds3d.png"
                      }
                  ]
