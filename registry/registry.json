@@ -230,18 +230,18 @@
                          "name":  "Faster Startup",
                          "author":  "104316stu",
                          "description":  "Makes ROUNDS start much faster with big modpacks (58 s to 34 s with 122 mods) and stops \u0027Not Responding\u0027 while it loads: batches config saves, pauses the garbage collector during loading, keeps loading when alt-tabbed. Gameplay unchanged.",
-                         "version":  "0.0.0",
+                         "version":  "1.0.0",
                          "category":  "Framework",
                          "installType":  "plugin",
                          "installFolder":  "FasterStartup",
                          "dependencies":  [
 
                                           ],
-                         "download":  "",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/fasterstartup-1.0.0/fasterstartup-1.0.0.zip",
                          "detect":  [
                                         "BepInEx/plugins/FasterStartup/FasterStartup.dll"
                                     ],
-                         "sha256":  "",
+                         "sha256":  "3b7232a4941b05c8354c341e7a30b9355277aff7fa9337532b5a1606eb362109",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/fasterstartup.png"
                      }
                  ]
