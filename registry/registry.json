@@ -252,18 +252,18 @@
                          "name":  "Log Share",
                          "author":  "104316stu",
                          "description":  "Opt-in multiplayer troubleshooting: press F8 to send your game logs and a snapshot of your game\u0027s state (map, card pick, frozen players, mod list) to the host. The host\u0027s F8 collects them from everyone. Saved in BepInEx/shared-logs. Can be switched off in its config.",
-                         "version":  "0.0.0",
+                         "version":  "1.0.0",
                          "category":  "Framework",
                          "installType":  "plugin",
                          "installFolder":  "LogShare",
                          "dependencies":  [
 
                                           ],
-                         "download":  "",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/logshare-1.0.0/logshare-1.0.0.zip",
                          "detect":  [
                                         "BepInEx/plugins/LogShare/LogShare.dll"
                                     ],
-                         "sha256":  "",
+                         "sha256":  "44152918b43cb835a3a9bb931585341f72f54cf218ec56d5577c7ecda4b949fe",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/logshare.png"
                      }
                  ]
