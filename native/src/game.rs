@@ -84,7 +84,7 @@ pub fn render(me: &mut ModNest, window: &mut Window, cx: &mut Context<ModNest>) 
                 .child(tab("modpacks", Tab::Modpacks, "Modpacks", None, false, cx))
                 .child(tab("profiles", Tab::Profiles, "Profiles", Some(arr(&st, "profiles").len()), false, cx)),
         )
-        .child(crate::library::scroll_area(div().id("tab-body").size_full().overflow_y_scroll().track_scroll(&me.tab_scroll).flex().flex_col().child(body), &me.tab_scroll, me.overflow))
+        .child(crate::library::scroll_area(div().id("tab-body").size_full().overflow_y_scroll().track_scroll(&me.tab_scroll).flex().flex_col().child(div().flex_none().w_full().flex().flex_col().child(body)), &me.tab_scroll, me.overflow))
         .into_any_element()
 }
 
