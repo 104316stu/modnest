@@ -66,12 +66,14 @@ Everyone's ModNest picks it up the next time they open the game. For a brand-new
 
 ## Releasing a new version of the app
 
-1. Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`).
-2. `git tag v0.2.0 && git push --tags`
+From 0.3.0 the installer contains the native app (`native/`, no WebView). It's built and signed on your PC:
 
-The GitHub Action builds the installer, signs it and publishes the release. Installed copies show an "Update and restart" bar.
-It needs one repo secret, `TAURI_SIGNING_PRIVATE_KEY`: the contents of `%USERPROFILE%\.tauri\modnest.key`
-(GitHub → repo Settings → Secrets and variables → Actions → New repository secret).
+1. Bump the version in `src-tauri/tauri.conf.json`, `package.json` and the `Cargo.toml` files of `core`, `src-tauri` and `native`.
+2. `powershell -ExecutionPolicy Bypass -File scripts\package-native.ps1`
+   (builds `native`, then the usual NSIS installer with the native exe in it, signed with `modnest.key`).
+3. Make `latest.json` and upload, as in steps 2–3 below.
+
+The GitHub Action (`git tag vX.Y.Z && git push --tags`) still builds the older WebView installer, so don't use it for native releases.
 
 **Or release from your own PC** (the key never leaves it; this is how v0.1.0 was published):
 
@@ -94,18 +96,26 @@ npm run dev        # run it
 npm run build      # installer -> $env:CARGO_TARGET_DIR\release\bundle\nsis
 ```
 
-Tests: `cd src-tauri; cargo test` (checks where files land for every package type, plus an install → disable → enable → remove round trip).
+The native app (GPUI) also needs Microsoft's shader compiler. On the GNU toolchain there's no `fxc.exe`, so build the stand-in in
+`tools/fxc-shim` (it calls `d3dcompiler_47.dll`, which ships with Windows) and point GPUI at it:
+
+```powershell
+cargo build --release --manifest-path toolsxc-shim\Cargo.toml
+$env:GPUI_FXC_PATH = "$env:CARGO_TARGET_DIReleasexc.exe"
+cargo run -p modnest-native     # run the native app
+```
+
+Tests: `cargo test -p modnest-core` (checks where files land for every package type, plus an install → disable → enable → remove round trip).
 
 ## Layout
 
 ```
-src-tauri/src/lib.rs           commands the UI calls, dependency resolving, install/update logic
-src-tauri/src/installer.rs     download, zip layout rules, enable/disable, uninstall
-src-tauri/src/thunderstore.rs  Thunderstore API + supported games
-src-tauri/src/steam.rs         Steam library detection
-src-tauri/src/registry.rs      your catalog (GitHub, cached, with a built-in fallback)
-src-tauri/src/profiles.rs      share codes, Thunderstore codes, Thunderstore Mod Manager import
-ui/                            the screens (plain HTML/CSS/JS, no build step)
+core/                          the engine (no UI): install/update logic, Thunderstore, CurseForge, Steam, profiles
+native/                        the app: native GPUI interface (window, screens, dialogs, self-updater)
+src-tauri/                     the older WebView app (thin layer over core) and the installer config/icons
+ui/                            the WebView screens (HTML/CSS/JS)
 registry/registry.json         your mods catalog
 scripts/publish-mod.ps1        publish a mod version
+scripts/package-native.ps1     build the signed installer with the native app
+tools/fxc-shim/                stand-in for fxc.exe so GPUI builds on the GNU toolchain
 ```

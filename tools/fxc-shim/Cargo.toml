@@ -1,0 +1,7 @@
+[package]
+name = "fxc"
+version = "0.1.0"
+edition = "2021"
+
+# Built on its own, not part of the ModNest workspace.
+[workspace]

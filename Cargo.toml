@@ -1,6 +1,6 @@
 # ModNest workspace: the engine (core), the current Tauri app, and the native GPUI app.
 [workspace]
-members = ["core", "src-tauri"]
+members = ["core", "src-tauri", "native"]
 resolver = "2"
 
 [profile.release]

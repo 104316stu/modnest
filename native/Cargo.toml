@@ -1,0 +1,29 @@
+[package]
+name = "modnest-native"
+version = "0.3.0"
+description = "ModNest with a native GPUI interface (no WebView)"
+edition = "2021"
+
+[[bin]]
+name = "modnest-native"
+path = "src/main.rs"
+
+[dependencies]
+modnest-core = { path = "../core" }
+gpui = "0.2.2"
+gpui-component = "0.5"
+gpui_http_client = "0.2.2"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+futures = "0.3"
+async-channel = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rfd = "0.15"
+open = "5"
+anyhow = "1"
+minisign-verify = "0.2"
+base64 = "0.22"
+
+[build-dependencies]
+embed-resource = "3"

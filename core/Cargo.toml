@@ -1,6 +1,6 @@
 [package]
 name = "modnest-core"
-version = "0.2.6"
+version = "0.3.0"
 description = "ModNest engine: games, mods, profiles and catalogs (no UI)"
 edition = "2021"
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <!-- the amber piece: a stem with a round tab that locks into the N -->
+    <g id="amber">
+      <path d="M624 288 Q624 232 680 232 H712 Q768 232 768 288 V736 Q768 792 712 792 H680 Q624 792 624 736 Z"/>
+      <rect x="590" y="606" width="40" height="52" />
+      <circle cx="578" cy="632" r="44"/>
+    </g>
+    <mask id="gap">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <use href="#amber" fill="#000" stroke="#000" stroke-width="48" stroke-linejoin="round"/>
+    </mask>
+    <clipPath id="underStem"><rect x="330" y="0" width="700" height="1024"/></clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="225" fill="#15181f"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="219" fill="none" stroke="#2a2f3a" stroke-width="12"/>
+  <g mask="url(#gap)">
+    <path clip-path="url(#underStem)" d="M268 232 H400 Q436 232 455 264 L768 792 H600 Z" fill="#3a72e6"/>
+    <path d="M256 288 Q256 232 312 232 H344 Q400 232 400 288 V736 Q400 792 344 792 H312 Q256 792 256 736 Z" fill="#4f8cff"/>
+  </g>
+  <use href="#amber" fill="#f5a524"/>
+</svg>
