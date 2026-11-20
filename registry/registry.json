@@ -1,6 +1,6 @@
 {
     "schema":  1,
-    "updated":  "2026-11-19",
+    "updated":  "2026-11-20",
     "games":  [
                   {
                       "id":  "chained-beasts",
@@ -208,18 +208,18 @@
                          "name":  "Rounds 3D",
                          "author":  "104316stu",
                          "description":  "Play ROUNDS as a first-person 3D shooter: real 3D movement and bullets, exact aim, FPS HUD, textures, 3D hazards and breakable boxes, plus a 3D battleground map (needs MapsExtended). Works online and with other mods.",
-                         "version":  "1.10.1",
+                         "version":  "1.11.0",
                          "category":  "Gameplay",
                          "installType":  "plugin",
                          "installFolder":  "Rounds3D",
                          "dependencies":  [
 
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/rounds3d-1.10.1/rounds3d-1.10.1.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/rounds3d-1.11.0/rounds3d-1.11.0.zip",
                          "detect":  [
                                         "BepInEx/plugins/Rounds3D/Rounds3D.dll"
                                     ],
-                         "sha256":  "02b5617cae50aeea6f49c1132f93a6f3ad43d3e25b65fac5c12d395c3fd539a3",
+                         "sha256":  "e84ce19c50152027ba42c5f94bdb31718a0b450cb1d6de8cc0e72e06a2d9776a",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/rounds3d.png"
                      },
                      {
