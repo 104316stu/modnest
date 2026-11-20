@@ -84,7 +84,7 @@ pub fn render(me: &mut ModNest, window: &mut Window, cx: &mut Context<ModNest>) 
                 .child(tab("modpacks", Tab::Modpacks, "Modpacks", None, false, cx))
                 .child(tab("profiles", Tab::Profiles, "Profiles", Some(arr(&st, "profiles").len()), false, cx)),
         )
-        .child(crate::library::scroll_area(div().id("tab-body").size_full().overflow_y_scroll().track_scroll(&me.tab_scroll).flex().flex_col().child(div().flex_none().w_full().flex().flex_col().child(body)), &me.tab_scroll, me.overflow))
+        .child(crate::library::scroll_area(div().id("tab-body").size_full().overflow_y_scroll().track_scroll(&me.tab_scroll).on_scroll_wheel(cx.listener(|this, _, _, cx| this.maybe_load_more(cx))).flex().flex_col().child(div().flex_none().w_full().flex().flex_col().child(body)), &me.tab_scroll, me.overflow))
         .into_any_element()
 }
 
@@ -543,7 +543,13 @@ fn browse(me: &mut ModNest, st: &Value, cx: &mut Context<ModNest>) -> impl IntoE
             div().flex().flex_col().gap(px(4.)).px(px(24.)).pt(px(6.)).pb(px(28.)).children(bw.items.iter().map(|m| browse_row(me, m, packs, cx))).into_any_element()
         })
         .when(bw.loading, |d| d.child(div().flex().justify_center().pb(px(28.)).pt(px(4.)).child(spinner(26.))))
-        .when(!bw.loading && bw.has_more, |d| d.child(div().flex().justify_center().pb(px(28.)).pt(px(4.)).child(button("more", Btn::Normal, false).child("Load more").on_click(cx.listener(|this, _, window, cx| this.load_more(window, cx))))))
+        // more pages load by themselves as you scroll (maybe_load_more); the button is only a fallback after an error
+        .when(!bw.loading && bw.has_more && !bw.error.is_empty(), |d| d.child(div().flex().justify_center().pb(px(28.)).pt(px(4.)).child(button("more", Btn::Normal, false).child("Try again").on_click(cx.listener(|this, _, window, cx| {
+            if let Some(bw) = this.browse.as_mut() {
+                bw.error.clear();
+            }
+            this.load_more(window, cx)
+        })))))
         .when(!bw.loading && bw.loaded && bw.items.is_empty() && !needs_key, |d| d.child(div().px(px(24.)).py(px(48.)).flex().justify_center().text_color(t::muted()).child(if bw.error.is_empty() { format!("No {noun} found on {}.", source_name(&source)) } else { bw.error.clone() })))
         .into_any_element()
 }

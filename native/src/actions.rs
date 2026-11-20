@@ -299,7 +299,13 @@ impl ModNest {
                         bw.has_more = b(&v, "hasMore");
                         bw.total = n(&v, "total");
                     }
-                    Err(e) => bw.error = e,
+                    Err(e) => {
+                        // a later page failed: retrying asks for the same page again
+                        if bw.page > 1 {
+                            bw.page -= 1;
+                        }
+                        bw.error = e
+                    }
                 }
                 bw.loading = false;
                 bw.loaded = true;
@@ -350,6 +356,26 @@ impl ModNest {
             }
         }
         self.load_browse(true, cx);
+    }
+
+    /// Infinite scroll: fetch the next page once the list is within ~600px of the bottom
+    /// (or when it doesn't fill the page yet).
+    pub fn maybe_load_more(&mut self, cx: &mut Context<Self>) {
+        if self.view != View::Game || !matches!(self.tab, Tab::Browse | Tab::Modpacks) {
+            return;
+        }
+        let Some(bw) = self.browse.as_ref() else { return };
+        if !bw.has_more || bw.loading || !bw.loaded || !bw.error.is_empty() {
+            return;
+        }
+        let scrolled = -f32::from(self.tab_scroll.offset().y);
+        let max = f32::from(self.tab_scroll.max_offset().height);
+        if max - scrolled < 600. {
+            if let Some(bw) = self.browse.as_mut() {
+                bw.page += 1;
+            }
+            self.load_browse(false, cx);
+        }
     }
 
     pub fn load_more(&mut self, _window: &mut Window, cx: &mut Context<Self>) {

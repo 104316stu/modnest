@@ -412,6 +412,10 @@ impl Render for ModNest {
             // sizes depend on it; draw again with the right gutter
             window.request_animation_frame();
         }
+        if self.view == View::Game {
+            // also catches scrollbar drags and lists too short to scroll
+            self.maybe_load_more(cx);
+        }
         let main_w = f32::from(window.viewport_size().width) - t::RAIL_W - 1.0 - if overflow { t::SCROLLBAR } else { 0. };
         self.main_w = main_w;
         let cols = (((main_w - 2.0 * t::LIB_PAD_X + 16.0) / (138.0 + 16.0)).floor() as usize).max(1);

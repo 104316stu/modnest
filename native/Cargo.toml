@@ -1,6 +1,6 @@
 [package]
 name = "modnest-native"
-version = "0.3.0"
+version = "0.3.1"
 description = "ModNest with a native GPUI interface (no WebView)"
 edition = "2021"
 
