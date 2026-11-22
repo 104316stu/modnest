@@ -1,6 +1,6 @@
 {
     "schema":  1,
-    "updated":  "2026-11-21",
+    "updated":  "2026-11-22",
     "games":  [
                   {
                       "id":  "chained-beasts",
@@ -57,18 +57,18 @@
                          "name":  "ChainedForge",
                          "author":  "ChainedForge",
                          "description":  "Mod framework for Chained Beasts. Run saves that keep your custom cards and Endless loop, a Continue button, Endless Runs with Risk of Rain scaling, card limits, a Tab run-stats panel that never blocks executions, in-game settings for everything, and a Mods menu. Needed by every Chained Beasts pack.",
-                         "version":  "0.2.0",
+                         "version":  "0.3.0",
                          "category":  "Framework",
                          "installType":  "plugin",
                          "installFolder":  "ChainedForge",
                          "dependencies":  [
                                               "bepinex-6-il2cpp"
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.2.0/chainedforge-0.2.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/chainedforge-0.3.0/chainedforge-0.3.0.zip",
                          "detect":  [
                                         "BepInEx/plugins/ChainedForge/ChainedForge.dll"
                                     ],
-                         "sha256":  "2a68e2e18ffc56a21af7f59657b0079c2b59087191420a91222b4bd595b745ff",
+                         "sha256":  "263493197b1e7c38cdb06e0fc644c62a9dcd9e024d977e7da4fef82c84eda622",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
                      },
                      {
