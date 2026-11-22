@@ -122,18 +122,18 @@
                          "name":  "Rounds \u0026 Rain",
                          "author":  "ChainedForge",
                          "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather revive, Blood Vial health stacking, Fungal Bloom, Reaper\u0027s Edge, Lunar glass-cannon trade-offs, a coin flip and four curses.",
-                         "version":  "1.0.0",
+                         "version":  "1.1.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
                          "installFolder":  "RoundsAndRain",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-rounds-and-rain-1.0.0/cf-rounds-and-rain-1.0.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-rounds-and-rain-1.1.0/cf-rounds-and-rain-1.1.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/RoundsAndRain/pack.json"
                                     ],
-                         "sha256":  "a2c9d044685bce2fe3eafaae0abf69962adfd9bc2d4546e565a6997992979afa",
+                         "sha256":  "880cac99045555e1797d844ee908fb64f8084e56b214b5c1ab728a4e9eeb8f48",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-rounds-and-rain.png"
                      },
                      {
