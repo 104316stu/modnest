@@ -100,18 +100,18 @@
                          "name":  "Arena Deck",
                          "author":  "ChainedForge",
                          "description":  "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, situational damage, gambles that hand out curses and Cleansing Rite to remove them. Exact numbers on every card.",
-                         "version":  "1.1.0",
+                         "version":  "1.2.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
                          "installFolder":  "ArenaDeck",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-arena-deck-1.1.0/cf-arena-deck-1.1.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-arena-deck-1.2.0/cf-arena-deck-1.2.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/ArenaDeck/pack.json"
                                     ],
-                         "sha256":  "25f98195f97aaf23d11de0806c1186c4b5ca148fd887c96ffa89a9be7b328c07",
+                         "sha256":  "c75b555c89da72e93b20587746675476815247376f194e81ef24c645b7635a59",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-arena-deck.png"
                      },
                      {
