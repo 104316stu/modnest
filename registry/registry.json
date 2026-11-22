@@ -144,18 +144,18 @@
                          "name":  "ChainedForge Starter Pack",
                          "author":  "ChainedForge",
                          "description":  "6 new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury, Second Wind, Eagle Eye, Fleet Footed) and 5 skills the developers cut, brought back.",
-                         "version":  "1.0.0",
+                         "version":  "1.1.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
                          "installFolder":  "StarterPack",
                          "dependencies":  [
                                               "chainedforge"
                                           ],
-                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-starter-pack-1.0.0/cf-starter-pack-1.0.0.zip",
+                         "download":  "https://github.com/104316stu/modnest/releases/download/cf-starter-pack-1.1.0/cf-starter-pack-1.1.0.zip",
                          "detect":  [
                                         "BepInEx/ChainedForgePacks/StarterPack/pack.json"
                                     ],
-                         "sha256":  "899f8871f5dc4fb3e569969fcb471e74f747954ee1386c0bab91a2e48cb50ccf",
+                         "sha256":  "0a07aff0ed627bcee74ddd9b74649c8575f0260fc22fef73c80927c759224805",
                          "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/cf-starter-pack.png"
                      },
                      {
