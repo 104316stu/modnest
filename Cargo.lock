@@ -4595,7 +4595,7 @@ dependencies = [
 
 [[package]]
 name = "modnest"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "modnest-core",
  "serde",
@@ -4611,7 +4611,7 @@ dependencies = [
 
 [[package]]
 name = "modnest-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4631,7 +4631,7 @@ dependencies = [
 
 [[package]]
 name = "modnest-native"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
