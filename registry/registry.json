@@ -56,7 +56,7 @@
                                    ],
                          "name":  "ChainedForge",
                          "author":  "ChainedForge",
-                         "description":  "Mod framework for Chained Beasts: Mods menu, Endless Runs (Risk of Rain scaling, Continue after victory), card limits, Tab run stats, testing mode. Needed by every Chained Beasts pack.",
+                         "description":  "Mod framework for Chained Beasts. Run saves that keep your custom cards and Endless loop, a Continue button, Endless Runs with Risk of Rain scaling, card limits, a Tab run-stats panel that never blocks executions, in-game settings for everything, and a Mods menu. Needed by every Chained Beasts pack.",
                          "version":  "0.2.0",
                          "category":  "Framework",
                          "installType":  "plugin",
@@ -99,7 +99,7 @@
                                    ],
                          "name":  "Arena Deck",
                          "author":  "ChainedForge",
-                         "description":  "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, gambles, jackpots, curses and the cards that cleanse them.",
+                         "description":  "20 ROUNDS-style cards with rarities: lifesteal, regen, dodge, situational damage, gambles that hand out curses and Cleansing Rite to remove them. Exact numbers on every card.",
                          "version":  "1.0.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
@@ -121,7 +121,7 @@
                                    ],
                          "name":  "Rounds \u0026 Rain",
                          "author":  "ChainedForge",
-                         "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather, Blood Vial, Fungal Bloom, Reaper\u0027s Edge, Shattered Glass, a coin flip and nasty curses.",
+                         "description":  "18 cards inspired by ROUNDS and Risk of Rain: Phoenix Feather revive, Blood Vial health stacking, Fungal Bloom, Reaper\u0027s Edge, Lunar glass-cannon trade-offs, a coin flip and four curses.",
                          "version":  "1.0.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
@@ -143,7 +143,7 @@
                                    ],
                          "name":  "ChainedForge Starter Pack",
                          "author":  "ChainedForge",
-                         "description":  "Six new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury...) and the developers\u0027 cut skills brought back.",
+                         "description":  "6 new trainer skills (Blood Pact, Iron Hide, Gladiator\u0027s Fury, Second Wind, Eagle Eye, Fleet Footed) and 5 skills the developers cut, brought back.",
                          "version":  "1.0.0",
                          "category":  "Cards",
                          "installType":  "cf-pack",
@@ -165,7 +165,7 @@
                                    ],
                          "name":  "Colosseum Hard Mode",
                          "author":  "ChainedForge",
-                         "description":  "Tougher arena: enemies +50% health and +30% damage, a stronger Senate boss, angry crowds throw pots and no starting coins.",
+                         "description":  "Tougher arena: all enemies and bosses +50% health and +30% damage, double-health Senate boss, the crowd throws pots and no starting coins.",
                          "version":  "1.0.0",
                          "category":  "Difficulty",
                          "installType":  "cf-pack",
@@ -198,7 +198,7 @@
                                               "cf-starter-pack"
                                           ],
                          "download":  "",
-                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chainedforge.png"
+                         "icon":  "https://raw.githubusercontent.com/104316stu/modnest/main/registry/icons/chained-beasts-complete.png"
                      },
                      {
                          "id":  "rounds3d",
