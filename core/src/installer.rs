@@ -7,6 +7,26 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Component, Path, PathBuf};
 
+/// Packs a folder into a zip in memory (uncompressed), so an unpacked package installs like a download.
+pub fn zip_dir(dir: &Path) -> Result<Vec<u8>> {
+    let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for e in fs::read_dir(&d)?.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                stack.push(p);
+                continue;
+            }
+            let rel = p.strip_prefix(dir)?.to_string_lossy().replace('\\', "/");
+            w.start_file(rel, opts)?;
+            std::io::Write::write_all(&mut w, &fs::read(&p)?)?;
+        }
+    }
+    Ok(w.finish()?.into_inner())
+}
+
 pub const DISABLED: &str = ".disabled";
 const SKIP_META: &[&str] = &["manifest.json", "icon.png", "readme.md", "changelog.md", "license", "license.md", "license.txt"];
 

@@ -226,3 +226,23 @@ fn short_codes_round_trip_and_old_codes_still_work() {
     assert!(new_len * 3 < old_len, "new {new_len} vs old {old_len}");
     assert!(decode("MN2-not-a-real-code").is_none());
 }
+
+#[test]
+fn installs_an_unpacked_package_from_another_managers_cache() {
+    // Thunderstore Mod Manager keeps packages unpacked: cache/<Namespace-Name>/<version>/
+    let base = std::env::temp_dir().join(format!("modnest-zipdir-{}", std::process::id()));
+    let pkg = base.join("cache").join("Auth-Mod").join("1.0.0");
+    let game = base.join("game");
+    std::fs::create_dir_all(pkg.join("plugins").join("Sub")).unwrap();
+    std::fs::create_dir_all(&game).unwrap();
+    std::fs::write(pkg.join("manifest.json"), "{}").unwrap();
+    std::fs::write(pkg.join("Mod.dll"), b"dll").unwrap();
+    std::fs::write(pkg.join("plugins").join("Sub").join("A.dll"), b"a").unwrap();
+    let bytes = zip_dir(&pkg).unwrap();
+    let mut files = extract(&game, Layout::Thunderstore, "Auth-Mod", &bytes).unwrap();
+    files.sort();
+    assert!(files.contains(&"BepInEx/plugins/Auth-Mod/Mod.dll".to_string()));
+    assert!(files.contains(&"BepInEx/plugins/Auth-Mod/Sub/A.dll".to_string()));
+    assert_eq!(std::fs::read(game.join("BepInEx/plugins/Auth-Mod/Sub/A.dll")).unwrap(), b"a");
+    let _ = std::fs::remove_dir_all(&base);
+}

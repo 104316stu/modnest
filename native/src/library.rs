@@ -375,7 +375,7 @@ pub fn render_mine(me: &mut ModNest, cx: &mut Context<ModNest>) -> impl IntoElem
                 .child(div().text_size(px(26.)).font_weight(FontWeight::BOLD).text_color(t::strong()).line_height(relative(1.45)).child("My stuff"))
                 .child(div().mt(px(2.)).text_color(t::muted()).child("Profiles, modpacks and published mods.")),
         );
-    let Some((data, mgr)) = me.mine.clone() else {
+    let Some((data, _)) = me.mine.clone() else {
         return div().size_full().flex().flex_col().child(head).child(div().flex_1().flex().items_center().justify_center().child(spinner(26.))).into_any_element();
     };
     let cols = grid_cols(me.main_w - 2. * t::LIB_PAD_X, 250., 12.);
@@ -456,26 +456,6 @@ pub fn render_mine(me: &mut ModNest, cx: &mut Context<ModNest>) -> impl IntoElem
                 .pb(px(30.))
                 .child(group_title("Your profiles"))
                 .child(div().px(px(t::LIB_PAD_X)).children(profiles).when(arr(&data, "profiles").is_empty(), |d| d.child(div().py(px(48.)).flex().justify_center().text_color(t::muted()).child("No profiles yet."))))
-                .when(!mgr.is_empty(), |d| {
-                    d.child(group_title("In Thunderstore Mod Manager on this PC")).child(div().px(px(t::LIB_PAD_X)).children(mgr.iter().map(|p| {
-                        let (gid, name) = (s(p, "gameId"), s(p, "name"));
-                        let mods: Vec<String> = arr(p, "mods").iter().filter_map(|m| m.as_str().map(String::from)).take(10).collect();
-                        crate::game::row_shell(false)
-                            .mb(px(4.))
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(12.))
-                                    .px(px(10.))
-                                    .py(px(6.))
-                                    .min_h(px(t::ROW_MIN_H))
-                                    .child(div().flex().flex_col().flex_1().min_w_0().child(div().flex().items_baseline().gap(px(6.)).child(div().font_weight(FontWeight::SEMIBOLD).text_color(t::strong()).child(name.clone())).child(div().text_color(t::muted()).text_size(px(12.)).child(s(p, "gameName")))).child(div().text_color(t::muted()).text_size(px(12.5)).ellipsis().child(mods.join(" · "))))
-                                    .child(div().text_color(t::muted()).text_size(px(12.)).child(plural(n(p, "count") as usize, "mod")))
-                                    .child(button(SharedString::from(format!("imp-{gid}-{name}")), Btn::Normal, true).child("Import").on_click(cx.listener(move |this, _, window, cx| this.import_manager_any(gid.clone(), name.clone(), window, cx)))),
-                            )
-                    })))
-                })
                 .child(
                     group_title("Published by you")
                         .child(pill("ModNest catalog", Tone::Line))

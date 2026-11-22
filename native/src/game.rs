@@ -255,30 +255,10 @@ fn play_menu(st: &Value, g: &Value, cx: &mut Context<ModNest>) -> impl IntoEleme
 
 // ---------- notes (warning bars above lists) ----------
 
-pub fn notes(me: &ModNest, st: &Value, cx: &mut Context<ModNest>) -> Option<AnyElement> {
+pub fn notes(_me: &ModNest, st: &Value, cx: &mut Context<ModNest>) -> Option<AnyElement> {
     let g = &st["game"];
     let installed = b(g, "installed");
     let mods = arr(st, "mods");
-    let active = arr(st, "profiles").iter().find(|p| b(p, "active"));
-    let gid = s(g, "id");
-    if let Some(all) = &me.mgr_all {
-        let offers: Vec<&Value> = all.iter().filter(|p| s(p, "gameId") == gid && n(p, "count") > 0 && !arr(st, "profiles").iter().any(|x| s(x, "name") == s(p, "name") && n(x, "count") > 0)).collect();
-        if installed && !offers.is_empty() && active.map(|a| n(a, "count") == 0).unwrap_or(true) {
-            return Some(
-                div()
-                    .flex()
-                    .flex_col()
-                    .children(offers.into_iter().take(3).map(|p| {
-                        let name = s(p, "name");
-                        let n2 = name.clone();
-                        note(Tone::Blue)
-                            .child(div().child(format!("Found “{}” ({}) in Thunderstore Mod Manager.", name, plural(n(p, "count") as usize, "mod"))))
-                            .child(button(SharedString::from(format!("use-{name}")), Btn::Primary, true).child("Use it").on_click(cx.listener(move |this, _, window, cx| this.import_manager(n2.clone(), window, cx))))
-                    }))
-                    .into_any_element(),
-            );
-        }
-    }
     let md = arr(st, "missingDeps");
     if installed && !md.is_empty() {
         let names: Vec<String> = md.iter().filter_map(|k| k.as_str()).map(|k| k.split_once(':').map(|x| x.1).unwrap_or(k).split_once('-').map(|x| x.1.to_string()).unwrap_or_else(|| k.to_string()).replace('_', " ")).collect();
@@ -712,7 +692,8 @@ pub fn profile_card(p: &Value) -> Div {
                 .gap(px(8.))
                 .child(div().flex_1().min_w_0().overflow_hidden().child(div().w_full().font_weight(FontWeight::BOLD).text_color(t::strong()).ellipsis().child(s(p, "name"))))
                 .when(active, |d| d.child(pill("In use", Tone::Blue)))
-                .when(!p["modpack"].is_null(), |d| d.child(pill("Modpack", Tone::Line))),
+                .when(!p["modpack"].is_null(), |d| d.child(pill("Modpack", Tone::Line)))
+                .when(b(p, "fromManager") && !s(p, "name").ends_with("(Thunderstore)"), |d| d.child(pill("Thunderstore", Tone::Line))),
         )
         .child(div().w_full().text_color(t::muted()).text_size(px(12.)).min_h(px(33.6)).overflow_hidden().text_ellipsis().line_clamp(2).child(if mods.is_empty() { "Empty".to_string() } else { mods.join(" · ") }))
 }
@@ -737,7 +718,6 @@ fn profiles_tab(me: &mut ModNest, st: &Value, cx: &mut Context<ModNest>) -> impl
             .child(label)
             .on_click(cx.listener(move |this, _, window, cx| on(this, window, cx)))
     };
-    let mgr: Vec<Value> = me.mgr_all.clone().unwrap_or_default().into_iter().filter(|p| s(p, "gameId") == s(g, "id")).collect();
     div()
         .flex()
         .flex_col()
@@ -782,25 +762,5 @@ fn profiles_tab(me: &mut ModNest, st: &Value, cx: &mut Context<ModNest>) -> impl
                 .child(div().mt(px(10.)).h(px(52.)).rounded(px(8.)).border_1().border_color(t::line()).bg(t::surface()).font_family("Consolas").text_size(px(12.)).child(Input::new(&me.code_in).appearance(false).h_full()))
                 .child(div().flex().mt(px(10.)).child(button("import-pasted", Btn::Primary, false).child("Import").on_click(cx.listener(|this, _, window, cx| this.import_pasted(window, cx))))),
         )
-        .when(!mgr.is_empty(), |d| {
-            d.child(
-                div()
-                    .mx(px(24.))
-                    .my(px(10.))
-                    .bg(t::surface())
-                    .border_1()
-                    .border_color(t::line_soft())
-                    .rounded(px(t::RADIUS))
-                    .px(px(16.))
-                    .py(px(14.))
-                    .child(div().text_size(px(15.)).font_weight(FontWeight::BOLD).text_color(t::strong()).mb(px(3.)).child("Found in Thunderstore Mod Manager"))
-                    .child(div().text_color(t::muted()).text_size(px(12.)).child("From another mod manager on this PC."))
-                    .children(mgr.iter().map(|p| {
-                        let name = s(p, "name");
-                        let n2 = name.clone();
-                        div().flex().items_center().gap(px(8.)).mt(px(10.)).child(div().font_weight(FontWeight::BOLD).child(name.clone())).child(div().flex_1().text_color(t::muted()).text_size(px(12.)).child(plural(n(p, "count") as usize, "mod"))).child(button(SharedString::from(format!("imgr-{name}")), Btn::Normal, true).child("Import").on_click(cx.listener(move |this, _, window, cx| this.import_manager(n2.clone(), window, cx))))
-                    })),
-            )
-        })
         .child(div().h(px(20.)))
 }

@@ -655,6 +655,8 @@ pub struct ProfileView {
     modpack: Option<String>,
     updated: u64,
     mods: Vec<String>,
+    /// Imported from Thunderstore Mod Manager / r2modman.
+    from_manager: bool,
 }
 
 #[derive(Serialize)]
@@ -734,6 +736,7 @@ fn state_of(st: &Core, g: &Game) -> GameState {
             modpack: p.modpack.clone(),
             updated: p.updated,
             mods: p.mods.iter().map(|m| m.title.clone()).collect(),
+            from_manager: p.manager.is_some(),
         })
         .collect();
     profiles.sort_by(|a, b| b.active.cmp(&a.active).then(a.name.to_lowercase().cmp(&b.name.to_lowercase())));
@@ -781,7 +784,7 @@ async fn install_many(st: &Core, g: &Game, keys: Vec<String>, force: bool, expli
         resolved.insert(key, p);
     }
 
-    for p in order {
+    for mut p in order {
         // A game only ever gets one loader (dependencies sometimes name a different BepInExPack).
         if p.layout == Layout::Root && !forced.contains(&p.key) {
             let has_loader = st.store.lock().unwrap().data.games.get(&g.id).map(|r| r.installed.values().any(|m| m.layout == "root")).unwrap_or(false);
@@ -794,6 +797,15 @@ async fn install_many(st: &Core, g: &Game, keys: Vec<String>, force: bool, expli
         } else {
             let cached = cache_file(st, &p.key, &p.version);
             if let Ok(b) = std::fs::read(&cached) {
+                b
+            } else if let Some((b, v)) = from_manager_cache(st, g, &p.key, Some(&p.version))
+                // Already on this PC from Thunderstore Mod Manager / r2modman: use that copy, even if it's an
+                // older version, rather than downloading. An update (forced) always gets the newest.
+                .or_else(|| if forced.contains(&p.key) { None } else { from_manager_cache(st, g, &p.key, None) })
+            {
+                p.version = v;
+                let _ = std::fs::create_dir_all(cache_dir(st));
+                let _ = std::fs::write(cache_file(st, &p.key, &p.version), &b);
                 b
             } else if p.download.is_empty() {
                 return Err(format!("{} has no download.", p.title));
@@ -968,6 +980,57 @@ fn profile_forget(st: &Core, g: &Game, key: &str) {
     s.save();
 }
 
+/// The package as a zip, taken from Thunderstore Mod Manager's / r2modman's download cache, if it's there.
+/// `version: None` takes the newest version that manager has. Returns the zip and its version.
+fn from_manager_cache(st: &Core, g: &Game, key: &str, version: Option<&str>) -> Option<(Vec<u8>, String)> {
+    let full = key.strip_prefix("ts:")?;
+    let community = g.ts.as_ref()?.id.clone();
+    let comms = st.communities.lock().unwrap().clone();
+    let (dir, v) = profiles::manager_package_dir(&comms, &community, full, version)?;
+    Some((installer::zip_dir(&dir).ok()?, v))
+}
+
+/// Thunderstore Mod Manager / r2modman profiles for this game show up as ModNest profiles by themselves.
+/// One that shares a name with a ModNest profile becomes "<name> (Thunderstore)". Later changes in the
+/// other manager are picked up (unless that profile is the one in use), and a deleted import stays deleted.
+fn sync_manager_profiles(st: &Core, g: &Game, found: &[(String, String, Vec<ProfileMod>)]) {
+    let Some(community) = g.ts.as_ref().map(|t| t.id.clone()) else { return };
+    let mine: Vec<&(String, String, Vec<ProfileMod>)> = found.iter().filter(|(c, _, _)| *c == community).collect();
+    if mine.is_empty() {
+        return;
+    }
+    let same = |a: &[ProfileMod], b: &[ProfileMod]| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.key == y.key && x.enabled == y.enabled);
+    let mut s = st.store.lock().unwrap();
+    let rec = s.game(&g.id);
+    let mut changed = false;
+    for (_, name, mods) in mine {
+        let linked = rec.profiles.values().find(|p| p.manager.as_deref() == Some(name.as_str())).map(|p| p.name.clone());
+        if let Some(pname) = linked {
+            if rec.active_profile.as_deref() != Some(pname.as_str()) {
+                if let Some(p) = rec.profiles.get_mut(&pname) {
+                    if !same(&p.mods, mods) {
+                        p.mods = mods.clone();
+                        p.updated = now();
+                        changed = true;
+                    }
+                }
+            }
+            continue;
+        }
+        if rec.manager_seen.contains(name) {
+            continue;
+        }
+        let base = if rec.profiles.contains_key(name) { format!("{name} (Thunderstore)") } else { name.clone() };
+        let pname = if !rec.profiles.contains_key(&base) { base.clone() } else { (2..).map(|i| format!("{base} {i}")).find(|n| !rec.profiles.contains_key(n)).unwrap() };
+        rec.profiles.insert(pname.clone(), Profile { name: pname, mods: mods.clone(), manager: Some(name.clone()), updated: now(), ..Default::default() });
+        rec.manager_seen.push(name.clone());
+        changed = true;
+    }
+    if changed {
+        s.save();
+    }
+}
+
 fn unique_name(st: &Core, g: &Game, want: &str) -> String {
     let s = st.store.lock().unwrap();
     let taken = |n: &str| s.data.games.get(&g.id).map(|r| r.profiles.contains_key(n)).unwrap_or(false);
@@ -1014,7 +1077,7 @@ fn keep_current_setup(st: &Core, g: &Game) {
         return;
     }
     let name = unique_name(st, g, "Default");
-    put_profile(st, g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
+    put_profile(st, g, Profile { name: name.clone(), mods, modpack: None, updated: now(), ..Default::default() });
     let mut s = st.store.lock().unwrap();
     s.game(&g.id).active_profile = Some(name);
     s.save();
@@ -1207,6 +1270,8 @@ pub async fn init(st: &Core, version: String) -> CmdResult<serde_json::Value> {
 
 pub async fn game_state(st: &Core, game_id: String) -> CmdResult<GameState> {
     let g = find_game(&st, &game_id)?;
+    let found = profiles::local_manager_profiles(&st.communities.lock().unwrap().clone());
+    sync_manager_profiles(&st, &g, &found);
     base_keys(&st, &g).await;
     Ok(state_of(&st, &g))
 }
@@ -1557,7 +1622,7 @@ pub async fn save_profile(st: &Core, game_id: String, name: String) -> CmdResult
     let g = find_game(&st, &game_id)?;
     let _guard = st.busy.lock().await;
     let name = unique_name(&st, &g, &name);
-    put_profile(&st, &g, Profile { name: name.clone(), mods: snapshot(&st, &g), modpack: None, updated: now() });
+    put_profile(&st, &g, Profile { name: name.clone(), mods: snapshot(&st, &g), modpack: None, updated: now(), ..Default::default() });
     {
         let mut s = st.store.lock().unwrap();
         s.game(&g.id).active_profile = Some(name);
@@ -1572,7 +1637,7 @@ pub async fn new_profile(st: &Core, game_id: String, name: String) -> CmdResult<
     let _guard = st.busy.lock().await;
     keep_current_setup(&st, &g);
     let name = unique_name(&st, &g, &name);
-    put_profile(&st, &g, Profile { name: name.clone(), mods: vec![], modpack: None, updated: now() });
+    put_profile(&st, &g, Profile { name: name.clone(), mods: vec![], modpack: None, updated: now(), ..Default::default() });
     apply_inner(&st, &g, &name).await?;
     Ok(state_of(&st, &g))
 }
@@ -1669,7 +1734,7 @@ pub async fn import_code(st: &Core, code: String, game_id: String) -> CmdResult<
     };
     let g = find_game(&st, &gid).map_err(|_| "That code is for a game ModNest doesn't know.".to_string())?;
     let name = import_name(&st, &g, &name);
-    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
+    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now(), ..Default::default() });
     Ok(json!({ "gameId": g.id, "name": name }))
 }
 
@@ -1692,8 +1757,19 @@ pub fn import_manager_profile(st: &Core, game_id: String, name: String) -> CmdRe
         .into_iter()
         .find(|(c, n, _)| *c == community && *n == name)
         .ok_or("That profile isn't there any more.")?;
-    let name = import_name(&st, &g, &name);
-    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: None, updated: now() });
+    let found = vec![(community, name.clone(), mods)];
+    sync_manager_profiles(&st, &g, &found);
+    let linked = st.store.lock().unwrap().data.games.get(&g.id).and_then(|r| r.profiles.values().find(|p| p.manager.as_deref() == Some(name.as_str())).map(|p| p.name.clone()));
+    let name = match linked {
+        Some(n) => n,
+        // imported before and then deleted: bring it back on request
+        None => {
+            let (_, _, mods) = found.into_iter().next().unwrap();
+            let n = unique_name(&st, &g, &format!("{name} (Thunderstore)"));
+            put_profile(&st, &g, Profile { name: n.clone(), mods, manager: Some(name.clone()), updated: now(), ..Default::default() });
+            n
+        }
+    };
     Ok(json!({ "gameId": g.id, "name": name }))
 }
 
@@ -1715,7 +1791,7 @@ pub async fn install_modpack(st: &Core, game_id: String, key: String, title: Str
     } else {
         vec![ProfileMod { key: key.clone(), title, version: String::new(), enabled: true }]
     };
-    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: Some(key), updated: now() });
+    put_profile(&st, &g, Profile { name: name.clone(), mods, modpack: Some(key), updated: now(), ..Default::default() });
     let failed = apply_inner(&st, &g, &name).await?;
     sync_active(&st, &g);
     Ok(Applied { state: state_of(&st, &g), failed, changed: true })
@@ -1886,6 +1962,10 @@ pub fn set_mods_folder(st: &Core, game_id: String, folder: String) -> CmdResult<
 /// Everything that's yours: profiles across all games, and what you've published in the ModNest catalog.
 pub fn my_stuff(st: &Core) -> serde_json::Value {
     let games = all_games(&st);
+    let found = profiles::local_manager_profiles(&st.communities.lock().unwrap().clone());
+    for g in games.iter().filter(|g| g.ts.as_ref().map(|t| found.iter().any(|(c, _, _)| *c == t.id)).unwrap_or(false)) {
+        sync_manager_profiles(&st, g, &found);
+    }
     let records = st.store.lock().unwrap().data.games.clone();
     let mut profiles = Vec::new();
     for (gid, rec) in records.iter().filter(|(_, r)| !r.profiles.is_empty()) {
@@ -1894,7 +1974,7 @@ pub fn my_stuff(st: &Core) -> serde_json::Value {
         let list: Vec<_> = rec
             .profiles
             .values()
-            .map(|p| json!({ "name": p.name, "count": p.mods.len(), "active": rec.active_profile.as_deref() == Some(p.name.as_str()), "modpack": p.modpack, "mods": p.mods.iter().map(|m| if m.title.is_empty() { m.key.clone() } else { m.title.clone() }).collect::<Vec<_>>() }))
+            .map(|p| json!({ "name": p.name, "count": p.mods.len(), "active": rec.active_profile.as_deref() == Some(p.name.as_str()), "modpack": p.modpack, "fromManager": p.manager.is_some(), "mods": p.mods.iter().map(|m| if m.title.is_empty() { m.key.clone() } else { m.title.clone() }).collect::<Vec<_>>() }))
             .collect();
         profiles.push(json!({ "gameId": g.id, "gameName": g.name, "capsule": v.capsule, "profiles": list }));
     }

@@ -52,6 +52,9 @@ pub struct Profile {
     pub modpack: Option<String>,
     #[serde(default)]
     pub updated: u64,
+    /// Name of the Thunderstore Mod Manager / r2modman profile this was imported from.
+    #[serde(default)]
+    pub manager: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -75,6 +78,9 @@ pub struct GameRecord {
     /// Where plain mod files go for this game (CurseForge / files without a loader).
     #[serde(default)]
     pub mods_folder: Option<String>,
+    /// Thunderstore Mod Manager profiles already imported once (deleting one doesn't bring it back).
+    #[serde(default)]
+    pub manager_seen: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

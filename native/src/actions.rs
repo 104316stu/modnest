@@ -165,13 +165,6 @@ impl ModNest {
                 this.state = Some(st);
                 this.on_tab_shown(window, cx);
                 this.auto_maintain(id.clone(), window, cx);
-                if this.mgr_all.is_none() {
-                    let core = this.core();
-                    this.exec(window, cx, async move { Ok(mn::manager_profiles(&core)) }, |this, l, _, cx| {
-                        this.mgr_all = Some(l);
-                        cx.notify();
-                    });
-                }
                 if let Some(f) = then {
                     f(this, (), window, cx);
                 }
@@ -191,7 +184,7 @@ impl ModNest {
         cx.notify();
         let core = self.core();
         cx.spawn(async move |this, cx| {
-            let r = bridge::run(async move { (mn::my_stuff(&core), mn::manager_profiles(&core)) }).await;
+            let r = bridge::run(async move { (mn::my_stuff(&core), Vec::new()) }).await;
             let _ = this.update(cx, |this, cx| {
                 if this.view == View::Mine {
                     this.mine = Some(r);
@@ -969,46 +962,6 @@ impl ModNest {
                         this.toast_error(&e);
                     },
                 );
-            }),
-        );
-    }
-
-    pub fn import_manager(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let gid = self.gid();
-        self.ready_then(
-            gid.clone(),
-            window,
-            cx,
-            Box::new(move |this, _, window, cx| match mn::import_manager_profile(&this.core, gid, name) {
-                Ok(r) => {
-                    this.tab = Tab::Installed;
-                    this.switch_profile(s(&r, "name"), window, cx);
-                }
-                Err(e) => this.toast_error(&e),
-            }),
-        );
-    }
-
-    pub fn import_manager_any(&mut self, gid: String, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.ready_then(
-            gid.clone(),
-            window,
-            cx,
-            Box::new(move |this, _, window, cx| match mn::import_manager_profile(&this.core, gid, name) {
-                Ok(r) => {
-                    let pname = s(&r, "name");
-                    this.open_game_then(
-                        s(&r, "gameId"),
-                        Tab::Installed,
-                        window,
-                        cx,
-                        Some(Box::new(move |this, _, window, cx| {
-                            this.switch_profile(pname.clone(), window, cx);
-                            this.toast("imp", format!("Imported “{pname}”"), "", "ok", None, 3000);
-                        })),
-                    );
-                }
-                Err(e) => this.toast_error(&e),
             }),
         );
     }
